@@ -407,7 +407,7 @@ const POLICIES = [
   ]},
 ];
 
-TEMPLATE_POLICIES = [
+var TEMPLATE_POLICIES = [
   {num:"1",title:"Mission Statement",content:"[YOUR COMPANY NAME] is committed to delivering exceptional, 5-star guest experiences with every cleaning service. These standards ensure consistent, high-quality service across all properties and team members. Every cleaner is an ambassador of this brand.",items:[]},
   {num:"2",title:"Professional Communication Standards",content:"",items:[
     "Maintain professional and courteous communication with all clients, guests, and team members at all times.",
