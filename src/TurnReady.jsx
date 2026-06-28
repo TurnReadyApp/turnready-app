@@ -856,8 +856,8 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
   var badge=<div style={{textAlign:"center",marginBottom:24}}>
     <div style={{display:"inline-block",background:"#CC0000",color:"#FFF",fontSize:10,fontWeight:800,letterSpacing:2,padding:"5px 14px",borderRadius:20,marginBottom:12,fontFamily:"Inter,sans-serif"}}>🧹 PRO CLEANING APP</div>
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:0,marginBottom:8}}>
-      <span style={{fontFamily:"Arial Black,Impact,sans-serif",fontSize:"9vw",fontWeight:900,letterSpacing:0,color:"#FFF",lineHeight:1}}>TURN</span>
-      <span style={{fontFamily:"Arial Black,Impact,sans-serif",fontSize:"9vw",fontWeight:900,letterSpacing:0,color:"#CC0000",lineHeight:1}}>READY</span>
+      <span style={{fontFamily:"Arial Black,Impact,sans-serif",fontSize:"clamp(32px, 9vw, 60px)",fontWeight:900,letterSpacing:0,color:"#FFF",lineHeight:1}}>TURN</span>
+      <span style={{fontFamily:"Arial Black,Impact,sans-serif",fontSize:"clamp(32px, 9vw, 60px)",fontWeight:900,letterSpacing:0,color:"#CC0000",lineHeight:1}}>READY</span>
     </div>
     <div style={{marginTop:14}}>
       <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",marginBottom:8}}>
