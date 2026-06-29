@@ -669,7 +669,7 @@ function AIChat({onClose,user}){
     try{
       var res=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
-        headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true"},
+        headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true","anthropic-version":"2023-06-01"},
         body:JSON.stringify({
           model:"claude-sonnet-4-6",
           max_tokens:1000,
@@ -678,12 +678,14 @@ function AIChat({onClose,user}){
         })
       });
       var d=await res.json();
+      if(d.error){throw new Error(d.error.message||JSON.stringify(d.error));}
       var text=(d.content&&d.content[0]&&d.content[0].text)||"Sorry, I could not get a response.";
       var finalMsgs=newMsgs.concat([{role:"ai",text:text}]);
       setMsgs(finalMsgs);
       saveMsgs(finalMsgs);
     }catch(e){
-      var errMsgs=newMsgs.concat([{role:"ai",text:"Sorry, I had trouble connecting. Please try again."}]);
+      var errText="Sorry, I had trouble connecting. Error: "+e.message;
+      var errMsgs=newMsgs.concat([{role:"ai",text:errText}]);
       setMsgs(errMsgs);
       saveMsgs(errMsgs);
     }
@@ -5154,7 +5156,12 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                       <div style={{fontSize:10,color:C.red,fontWeight:700,letterSpacing:.5,marginBottom:8,textTransform:"uppercase"}}>📸 Reference — This is how it should look</div>
                       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                         {(room.refPhotos||[]).map(function(ph,i){
-                          return <img key={i} src={ph} alt={"ref "+(i+1)} style={{width:90,height:90,borderRadius:8,objectFit:"cover",flexShrink:0}}/>;
+                          return <img key={i} src={ph} alt={"ref "+(i+1)} 
+                            onClick={function(){
+                              var win=window.open("","_blank");
+                              win.document.write("<html><body style='margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh'><img src=\'"+ph+"\' style=\'max-width:100%;max-height:100vh;object-fit:contain\'/></body></html>");
+                            }}
+                            style={{width:90,height:90,borderRadius:8,objectFit:"cover",flexShrink:0,cursor:"pointer"}}/>;
                         })}
                         {room.refVideo&&<video src={room.refVideo} controls style={{width:90,height:90,borderRadius:8,objectFit:"cover",flexShrink:0}}/>}
                       </div>
@@ -5180,7 +5187,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                       borderRadius:8,padding:"10px",cursor:"pointer",marginBottom:12}}>
                       <span style={{fontSize:16}}>📹</span>
                       <span style={{fontSize:12,fontWeight:600,color:"#F59E0B"}}>Upload Pre-Clean Video</span>
-                      <input type="file" accept="video/*" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
+                      <input type="file" accept="video/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
                         onChange={function(e){
                           var file=e.target.files[0];if(!file)return;
                           var reader=new FileReader();
@@ -5195,32 +5202,30 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
 
                   <div style={{borderTop:"1px solid #2A2A2A",marginBottom:12}}/>
                   <div style={{fontSize:10,color:"#888",fontWeight:700,letterSpacing:.5,marginBottom:8,textTransform:"uppercase"}}>🎥 Your After-Clean Video (Required)</div>
-                  {room.video&&<video src={room.video} controls style={{width:"100%",borderRadius:8,marginBottom:8,maxHeight:200}}/>}
                   {room.video&&(
                     <div style={{marginBottom:10,position:"relative"}}>
-                      <video src={room.video} controls style={{width:"100%",borderRadius:8,maxHeight:180}}/>
-                      <button onClick={function(){setProps(function(ps){return ps.map(function(pp){
-                        if(pp.id!==prop.id)return pp;
-                        return Object.assign({},pp,{rooms:pp.rooms.map(function(rm){return rm.id!==room.id?rm:Object.assign({},rm,{video:null,videoName:null});})});
-                      });});}}
-                        style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.75)",border:"none",borderRadius:6,color:"#FFF",fontSize:11,padding:"4px 8px",cursor:"pointer"}}>✕ Remove</button>
-                      <div style={{fontSize:11,color:"#22C55E",fontWeight:600,marginTop:4}}>✓ {room.videoName||"Video uploaded"}</div>
+                      <video src={room.video} controls style={{width:"100%",borderRadius:8,maxHeight:200}}/>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+                        <div style={{fontSize:11,color:"#22C55E",fontWeight:600}}>✓ {room.videoName||"Video uploaded"}</div>
+                        <button onClick={function(){setProps(function(ps){return ps.map(function(pp){
+                          if(pp.id!==prop.id)return pp;
+                          return Object.assign({},pp,{rooms:pp.rooms.map(function(rm){return rm.id!==room.id?rm:Object.assign({},rm,{video:null,videoName:null});})});
+                        });});}}
+                          style={{background:"transparent",border:"1px solid #EF4444",borderRadius:6,color:"#EF4444",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>✕ Remove</button>
+                      </div>
                     </div>
                   )}
+                  {!room.video&&(
                   <label style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
-                    background:room.video?"rgba(34,197,94,.08)":"rgba(204,0,0,.1)",
-                    border:"1.5px dashed "+(room.video?"#22C55E":"#CC0000"),
-                    borderRadius:10,padding:"14px",cursor:started?"pointer":"not-allowed",
-                    opacity:started?1:.5}}>
-                    <span style={{fontSize:28}}>{room.video?"✅":"📹"}</span>
-                    <span style={{fontSize:12,fontWeight:900,fontFamily:"Arial Black,sans-serif",
-                      color:room.video?"#22C55E":"#CC0000",letterSpacing:.3}}>
-                      {room.video?"✓ VIDEO UPLOADED — TAP TO REPLACE":"TAP TO RECORD OR UPLOAD"}
-                    </span>
-                    <span style={{fontSize:10,color:"#888"}}>
-                      {room.video?"After-clean video saved":"Record after cleaning this room"}
-                    </span>
-                    <input type="file" accept="video/*,image/*" disabled={!started}
+                    background:"rgba(204,0,0,.1)",
+                    border:"1.5px dashed #CC0000",
+                    borderRadius:10,padding:"18px 14px",cursor:started?"pointer":"not-allowed",
+                    opacity:started?1:.5,marginBottom:4}}>
+                    <span style={{fontSize:32}}>🎬</span>
+                    <span style={{fontSize:13,fontWeight:900,fontFamily:"Arial Black,sans-serif",
+                      color:"#CC0000",letterSpacing:.3}}>TAP TO RECORD OR UPLOAD</span>
+                    <span style={{fontSize:11,color:"#888"}}>Record a video after cleaning this room</span>
+                    <input type="file" accept="video/*" capture="environment" disabled={!started}
                       style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
                       onChange={function(e){
                         var file=e.target.files[0];if(!file)return;
@@ -5233,6 +5238,27 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                         });});
                       }}/>
                   </label>
+                  )}
+                  {!room.video&&started&&(
+                  <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                    background:"#1A1A1A",border:"1px solid #333",
+                    borderRadius:10,padding:"10px 14px",cursor:"pointer",marginTop:6}}>
+                    <span style={{fontSize:16}}>📁</span>
+                    <span style={{fontSize:12,fontWeight:600,color:"#888"}}>Or upload from gallery</span>
+                    <input type="file" accept="video/*" disabled={!started}
+                      style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
+                      onChange={function(e){
+                        var file=e.target.files[0];if(!file)return;
+                        uploadRoomVideo(prop.id,room.id,file);
+                        setProps(function(ps){return ps.map(function(pp){
+                          if(pp.id!==prop.id)return pp;
+                          return Object.assign({},pp,{rooms:pp.rooms.map(function(rm){
+                            return rm.id!==room.id?rm:Object.assign({},rm,{videoName:file.name});
+                          })});
+                        });});
+                      }}/>
+                  </label>
+                  )}
                   {!started&&<div style={{fontSize:10,color:C.muted,textAlign:"center",marginTop:6}}>Start the job first to upload</div>}
                 </div>
               );
@@ -8441,7 +8467,7 @@ export default function App() {
               setShowMgrStripe(true);
             }
             if(isNew&&u.role==="cleaner"){
-              setShowOnboarding(false);
+              setShowOnboarding(true);
               // Notify manager
               setNotifications(function(prev){
                 var n={id:"notif"+Date.now(),type:"new_cleaner",icon:"🧹",title:"New Cleaner Joined!",body:(newCleaner?newCleaner.name:u.name)+" just signed up with your invite code and is ready to be assigned.",time:new Date().toISOString(),read:false,forRole:"manager",navTo:"Team"};
@@ -8480,10 +8506,16 @@ export default function App() {
         );})}
       </div>
       <div style={{padding:"16px 24px 32px"}}>
-        <button onClick={function(){setOnboardingStep("stripe");}}
-          style={{width:"100%",background:"#CC0000",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer"}}>
-          NEXT: SET UP PAYMENTS →
-        </button>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <button onClick={function(){setOnboardingStep("stripe");}}
+            style={{width:"100%",background:"#CC0000",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer"}}>
+            NEXT: SET UP PAYMENTS →
+          </button>
+          <button onClick={function(){setShowOnboarding(false);setOnboardingStep("welcome");setView("Home");}}
+            style={{width:"100%",background:"transparent",border:"1px solid #333",borderRadius:10,padding:"12px",color:"#666",fontSize:12,cursor:"pointer"}}>
+            Skip — Go to the App
+          </button>
+        </div>
       </div>
     </div>
   );
