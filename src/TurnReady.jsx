@@ -669,7 +669,7 @@ function AIChat({onClose,user}){
     try{
       var res=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
-        headers:{"Content-Type":"application/json"},
+        headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true"},
         body:JSON.stringify({
           model:"claude-sonnet-4-6",
           max_tokens:1000,
@@ -1874,7 +1874,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                   <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
                     {(r.refPhotos||[]).map(function(ph,i){return(
                       <div key={i} style={{position:"relative",flexShrink:0}}>
-                        <img src={ph} alt={"ref "+(i+1)} style={{width:80,height:80,borderRadius:8,objectFit:"cover",display:"block"}}/>
+                        <img src={ph} alt={"ref "+(i+1)} onClick={function(){setGalleryIdx(galleryImages.findIndex(function(g){return g.url===ph;}));setShowGallery(true);}} style={{width:80,height:80,borderRadius:8,objectFit:"cover",display:"block",cursor:"pointer"}}/>
                         <button onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){if(rm.id!==r.id)return rm;var ph2=(rm.refPhotos||[]).filter(function(_,j){return j!==i;});return Object.assign({},rm,{refPhotos:ph2});})});});});}}
                           style={{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:"50%",background:"#EF4444",border:"none",color:"#FFF",fontSize:10,cursor:"pointer",fontWeight:900}}>x</button>
                       </div>
@@ -2867,11 +2867,11 @@ function Cleaners({cleaners,setCleaners,jobs,pendingCleaners,setPendingCleaners,
           Tell your cleaner: Open TurnReady, tap New Cleaner, fill in their info, enter the code <strong style={{color:"#FFF"}}>HARVEY2024</strong> and they will be signed in instantly with full access.
         </div>
         <div style={{background:"#0D0D0D",border:"1px solid #2A2A2A",borderRadius:8,padding:"12px 14px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-          <div style={{fontSize:11,color:"#AAA",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>turnready.app/join?code=MGR-HARVEY</div>
-          <button onClick={()=>{if(navigator.clipboard)navigator.clipboard.writeText("turnready.app/join?code=MGR-HARVEY");setInviteCopied(true);setTimeout(()=>setInviteCopied(false),2000);}} style={{background:"#CC0000",border:"none",borderRadius:6,padding:"6px 12px",color:"#FFF",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>{inviteCopied?"✓ Copied!":"Copy Link"}</button>
+          <div style={{fontSize:11,color:"#AAA",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>app.turnready.app</div>
+          <button onClick={()=>{if(navigator.clipboard)navigator.clipboard.writeText("app.turnready.app");setInviteCopied(true);setTimeout(()=>setInviteCopied(false),2000);}} style={{background:"#CC0000",border:"none",borderRadius:6,padding:"6px 12px",color:"#FFF",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>{inviteCopied?"✓ Copied!":"Copy Link"}</button>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <button className="btn" style={{flex:1}} onClick={()=>{var shareMsg="Hi! Join my cleaning team on TurnReady: turnready.app/join?code=MGR-HARVEY";if(navigator.share)navigator.share({title:"Join my TurnReady team",text:msg});else if(navigator.clipboard){navigator.clipboard.writeText(msg);setInviteCopied(true);setTimeout(()=>setInviteCopied(false),2000);}}}>📱 Share via Phone</button>
+          <button className="btn" style={{flex:1}} onClick={()=>{var shareMsg="Hi! Join my cleaning team on TurnReady: app.turnready.app";if(navigator.share)navigator.share({title:"Join my TurnReady team",text:shareMsg});else if(navigator.clipboard){navigator.clipboard.writeText(shareMsg);setInviteCopied(true);setTimeout(()=>setInviteCopied(false),2000);}}}>📱 Share via Phone</button>
           <button className="btn ghost sm" onClick={()=>setShowInvite(false)}>Close</button>
         </div>
         <div style={{fontSize:10,color:"#555",marginTop:10,textAlign:"center"}}>Invite links are fully active after deployment.</div>
@@ -5220,7 +5220,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                     <span style={{fontSize:10,color:"#888"}}>
                       {room.video?"After-clean video saved":"Record after cleaning this room"}
                     </span>
-                    <input type="file" accept="video/*,image/*" capture="environment" disabled={!started}
+                    <input type="file" accept="video/*,image/*" disabled={!started}
                       style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
                       onChange={function(e){
                         var file=e.target.files[0];if(!file)return;
@@ -5898,7 +5898,7 @@ function Messages({user,cleaners,addNotification}){
   const [selCleaner,setSelCleaner]=useState(null);
   const [showBroadcast,setShowBroadcast]=useState(false);
   const [broadcastInput,setBroadcastInput]=useState("");
-  const [msgs,setMsgs]=useState({});
+  const [msgs,setMsgs]=useState(function(){try{var s=localStorage.getItem("turnready_msgs");return s?JSON.parse(s):{};}catch(e){return {};}});
   const [input,setInput]=useState("");
   const [mediaPreview,setMediaPreview]=useState(null); // {url, type:'image'|'video', name}
 
@@ -5918,6 +5918,7 @@ function Messages({user,cleaners,addNotification}){
     setMsgs(function(prev){
       var updated=Object.assign({},prev);
       updated[key]=(prev[key]||[]).concat([newMsg]);
+      try{localStorage.setItem("turnready_msgs",JSON.stringify(updated));}catch(e){}
       return updated;
     });
     setInput("");
@@ -5946,6 +5947,7 @@ function Messages({user,cleaners,addNotification}){
           addNotification({type:"message",icon:"📢",title:"Broadcast from Harvey",body:broadcastInput.trim().slice(0,60)+(broadcastInput.trim().length>60?"...":""),forRole:"cleaner",forCleaner:c.id,navTo:"Messages",time:new Date().toISOString(),read:false});
         }
       });
+      try{localStorage.setItem("turnready_msgs",JSON.stringify(updated));}catch(e){}
       return updated;
     });
     setBroadcastInput("");
@@ -8139,7 +8141,7 @@ export default function App() {
   const [jobs, setJobs] = useState(INIT_JOBS);
   const [pendingRemovals, setPendingRemovals] = useState([]);
   const [pendingCleaners, setPendingCleaners] = useState([]);
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState(function(){try{var s=localStorage.getItem("turnready_notifications");return s?JSON.parse(s):[];}catch(e){return [];}});
   const [notifRead, setNotifRead] = useState({});
 
   // Persist notifications to localStorage
@@ -8439,7 +8441,7 @@ export default function App() {
               setShowMgrStripe(true);
             }
             if(isNew&&u.role==="cleaner"){
-              setShowOnboarding(true);
+              setShowOnboarding(false);
               // Notify manager
               setNotifications(function(prev){
                 var n={id:"notif"+Date.now(),type:"new_cleaner",icon:"🧹",title:"New Cleaner Joined!",body:(newCleaner?newCleaner.name:u.name)+" just signed up with your invite code and is ready to be assigned.",time:new Date().toISOString(),read:false,forRole:"manager",navTo:"Team"};
