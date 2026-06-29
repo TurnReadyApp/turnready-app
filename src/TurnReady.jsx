@@ -667,19 +667,16 @@ function AIChat({onClose,user}){
     setLoading(true);
     var userContent=mediaPreview&&mediaPreview.type==="image"?[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:mediaPreview.url.split(",")[1]||""}},{type:"text",text:q||"What do you see? Give cleaning advice."}]:q;
     try{
-      var res=await fetch("https://api.anthropic.com/v1/messages",{
+      var res=await fetch("/.netlify/functions/ai",{
         method:"POST",
-        headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true","anthropic-version":"2023-06-01"},
+        headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"claude-sonnet-4-6",
-          max_tokens:1000,
-          system:"You are the TurnReady AI assistant built into a professional cleaning management app for Harvey's Professional Cleaning LLC. Help with cleaning protocols, Airbnb staging, property management, and app usage. Keep responses concise and practical for mobile viewing.",
-          messages:[{role:"user",content:userContent}]
+          messages:[{role:"user",content:typeof userContent==="string"?userContent:userContent}]
         })
       });
       var d=await res.json();
-      if(d.error){throw new Error(d.error.message||JSON.stringify(d.error));}
-      var text=(d.content&&d.content[0]&&d.content[0].text)||"Sorry, I could not get a response.";
+      if(!res.ok||d.error){throw new Error(d.error||"API error "+res.status);}
+      var text=d.text||"Sorry, I could not get a response.";
       var finalMsgs=newMsgs.concat([{role:"ai",text:text}]);
       setMsgs(finalMsgs);
       saveMsgs(finalMsgs);
@@ -5158,8 +5155,19 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                         {(room.refPhotos||[]).map(function(ph,i){
                           return <img key={i} src={ph} alt={"ref "+(i+1)} 
                             onClick={function(){
-                              var win=window.open("","_blank");
-                              win.document.write("<html><body style='margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh'><img src=\'"+ph+"\' style=\'max-width:100%;max-height:100vh;object-fit:contain\'/></body></html>");
+                              var overlay=document.createElement("div");
+                              overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:flex;align-items:center;justify-content:center;";
+                              overlay.onclick=function(){document.body.removeChild(overlay);};
+                              var img=document.createElement("img");
+                              img.src=ph;
+                              img.style.cssText="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;";
+                              var close=document.createElement("button");
+                              close.textContent="✕";
+                              close.style.cssText="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.2);border:none;color:#FFF;font-size:20px;width:36px;height:36px;border-radius:50%;cursor:pointer;";
+                              close.onclick=function(){document.body.removeChild(overlay);};
+                              overlay.appendChild(img);
+                              overlay.appendChild(close);
+                              document.body.appendChild(overlay);
                             }}
                             style={{width:90,height:90,borderRadius:8,objectFit:"cover",flexShrink:0,cursor:"pointer"}}/>;
                         })}
@@ -6052,23 +6060,45 @@ function Messages({user,cleaners,addNotification}){
               <div style={{fontSize:10,color:"#888",marginTop:2}}>{mediaPreview.name}</div>
             </div>
           )}
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            {/* Media attach button */}
-            <label style={{width:40,height:40,borderRadius:"50%",background:"#1A1A1A",border:"1px solid #2A2A2A",
-              display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:18}}>
-              📎
-              <input type="file" accept="image/*,video/*" capture="environment"
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            {/* 📷 Take Photo */}
+            <label style={{width:38,height:38,borderRadius:"50%",background:"#1A1A1A",border:"1px solid #2A2A2A",
+              display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:17}} title="Take Photo">
+              📷
+              <input type="file" accept="image/*" capture="environment"
                 style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
                 onChange={function(e){
                   var file=e.target.files[0]; if(!file)return;
                   var reader=new FileReader();
-                  reader.onload=function(ev){
-                    setMediaPreview({
-                      url:ev.target.result,
-                      type:file.type.startsWith("video")?"video":"image",
-                      name:file.name
-                    });
-                  };
+                  reader.onload=function(ev){setMediaPreview({url:ev.target.result,type:"image",name:file.name});};
+                  reader.readAsDataURL(file);
+                  e.target.value="";
+                }}/>
+            </label>
+            {/* 🎬 Record Video */}
+            <label style={{width:38,height:38,borderRadius:"50%",background:"#1A1A1A",border:"1px solid #2A2A2A",
+              display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:17}} title="Record Video">
+              🎬
+              <input type="file" accept="video/*" capture="environment"
+                style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
+                onChange={function(e){
+                  var file=e.target.files[0]; if(!file)return;
+                  var reader=new FileReader();
+                  reader.onload=function(ev){setMediaPreview({url:ev.target.result,type:"video",name:file.name});};
+                  reader.readAsDataURL(file);
+                  e.target.value="";
+                }}/>
+            </label>
+            {/* 📁 Upload from Gallery */}
+            <label style={{width:38,height:38,borderRadius:"50%",background:"#1A1A1A",border:"1px solid #2A2A2A",
+              display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:17}} title="Upload from Gallery">
+              📁
+              <input type="file" accept="image/*,video/*"
+                style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
+                onChange={function(e){
+                  var file=e.target.files[0]; if(!file)return;
+                  var reader=new FileReader();
+                  reader.onload=function(ev){setMediaPreview({url:ev.target.result,type:file.type.startsWith("video")?"video":"image",name:file.name});};
                   reader.readAsDataURL(file);
                   e.target.value="";
                 }}/>
@@ -8577,23 +8607,22 @@ export default function App() {
       <div style={{padding:"16px 24px 32px",borderTop:"1px solid #2A2A2A"}}>
         {/* Connect Stripe button */}
         <button onClick={function(){
-          // Simulate Stripe connect - mark as connected
+          var acct="acct_"+Date.now();
+          var updatedUser=Object.assign({},user,{stripeStatus:"connected",stripeAccount:acct});
           setCleaners(function(cs){return cs.map(function(c){
-            return c.id!==user.id?c:Object.assign({},c,{stripeStatus:"connected",stripeAccount:"acct_"+Date.now()});
+            return c.id!==user.id?c:Object.assign({},c,{stripeStatus:"connected",stripeAccount:acct});
           });});
-          setUser(function(u){return Object.assign({},u,{stripeStatus:"connected",stripeAccount:"acct_"+Date.now()});});
-          // Persist
+          setUser(updatedUser);
           try{
             var stored=localStorage.getItem("turnready_cleaners");
             var existing=stored?JSON.parse(stored):[];
             var fi=existing.findIndex(function(c){return c.id===user.id;});
-            var updated=Object.assign({},user,{stripeStatus:"connected",stripeAccount:"acct_"+Date.now()});
-            if(fi>=0)existing[fi]=updated; else existing.push(updated);
+            if(fi>=0)existing[fi]=Object.assign({},existing[fi],{stripeStatus:"connected",stripeAccount:acct});
+            else existing.push(updatedUser);
             localStorage.setItem("turnready_cleaners",JSON.stringify(existing));
           }catch(e){}
           setShowOnboarding(false);
           setOnboardingStep("welcome");
-          setView("Home");
         }} style={{width:"100%",background:"#635BFF",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer",marginBottom:10}}>
           💳 CONNECT STRIPE & GET PAID
         </button>
@@ -8681,9 +8710,11 @@ export default function App() {
 
       <div style={{padding:"16px 24px 32px",borderTop:"1px solid #2A2A2A"}}>
         <button onClick={function(){
-          var updated=Object.assign({},user,{stripeBusinessStatus:"connected",stripeBusinessAccount:"acct_mgr_"+Date.now()});
+          var acct="acct_mgr_"+Date.now();
+          var updated=Object.assign({},user,{stripeBusinessStatus:"connected",stripeBusinessAccount:acct});
           setUser(updated);
           setShowMgrStripe(false);
+          setView("Dashboard");
         }} style={{width:"100%",background:"#635BFF",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer",marginBottom:10}}>
           💳 CONNECT STRIPE BUSINESS ACCOUNT
         </button>
