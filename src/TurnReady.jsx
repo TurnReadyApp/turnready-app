@@ -3988,12 +3988,46 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
             )}
             {reviewJob.uploads&&reviewJob.uploads.length>0&&(
               <div style={{background:"#1A1A1A",borderRadius:10,padding:14,marginBottom:14}}>
-                <div style={{fontSize:11,color:"#888",textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>Photos</div>
+                <div style={{fontSize:11,color:"#888",textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>Photos & Videos — tap to view full screen</div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  {reviewJob.uploads.map(function(u,i){return(
-                    <div key={i} style={{position:"relative",display:"inline-block"}}>
-                      <img src={u.url||u} alt="upload" style={{width:90,height:90,borderRadius:8,objectFit:"cover",display:"block"}}/>
-                      <button onClick={function(){downloadMedia(u.url||u,(u.name||"photo-"+i)+".jpg");}}
+                  {reviewJob.uploads.map(function(u,i){
+                    var src=u.url||u;
+                    var isVideo=u.type==="video"||(typeof src==="string"&&src.startsWith("data:video"));
+                    function openFull(){
+                      var overlay=document.createElement("div");
+                      overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;";
+                      overlay.onclick=function(e){if(e.target===overlay)document.body.removeChild(overlay);};
+                      if(isVideo){
+                        var vid=document.createElement("video");
+                        vid.src=src;vid.controls=true;vid.autoplay=true;
+                        vid.style.cssText="max-width:95vw;max-height:85vh;border-radius:8px;";
+                        overlay.appendChild(vid);
+                      } else {
+                        var img=document.createElement("img");
+                        img.src=src;
+                        img.style.cssText="max-width:95vw;max-height:85vh;object-fit:contain;border-radius:8px;";
+                        overlay.appendChild(img);
+                      }
+                      var close=document.createElement("button");
+                      close.textContent="✕ Close";
+                      close.style.cssText="margin-top:16px;background:rgba(255,255,255,.15);border:none;color:#FFF;font-size:14px;padding:8px 20px;border-radius:20px;cursor:pointer;";
+                      close.onclick=function(){document.body.removeChild(overlay);};
+                      overlay.appendChild(close);
+                      document.body.appendChild(overlay);
+                    }
+                    return(
+                    <div key={i} style={{position:"relative",display:"inline-block",cursor:"pointer"}} onClick={openFull}>
+                      {isVideo?(
+                        <div style={{width:90,height:90,borderRadius:8,background:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",position:"relative"}}>
+                          <video src={src} style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:8}}/>
+                          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,.3)"}}>
+                            <span style={{fontSize:24}}>▶</span>
+                          </div>
+                        </div>
+                      ):(
+                        <img src={src} alt={"upload "+(i+1)} style={{width:90,height:90,borderRadius:8,objectFit:"cover",display:"block"}}/>
+                      )}
+                      <button onClick={function(e){e.stopPropagation();downloadMedia(src,(u.name||"file-"+i)+(isVideo?".mp4":".jpg"));}}
                         style={{position:"absolute",bottom:4,right:4,background:"rgba(0,0,0,.8)",border:"none",borderRadius:4,color:"#22C55E",fontSize:9,padding:"2px 5px",cursor:"pointer",fontWeight:700}}>⬇️</button>
                     </div>
                   );})}
@@ -4292,19 +4326,19 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
                 <div style={{fontSize:11,color:"#888",lineHeight:1.5,marginBottom:10}}>Share this link with your guest so they can rate the cleanliness. Their score will update this property's rating.</div>
                 <div style={{background:"#0D0D0D",border:"1px solid #2A2A2A",borderRadius:8,padding:"10px 12px",marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
                   <div style={{fontSize:11,color:"#AAA",fontFamily:"monospace",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    {"turnready.app/review?job="+(ratingJob?ratingJob.id:"")+"&prop="+(ratingJob?ratingJob.propertyId||ratingJob.propertyName:"")}
+                    {"app.turnready.app/review?job="+(ratingJob?ratingJob.id:"")+"&prop="+(ratingJob?ratingJob.propertyId||ratingJob.propertyName:"")}
                   </div>
                 </div>
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={function(){
-                    var link="turnready.app/review?job="+(ratingJob?ratingJob.id:"")+"&prop="+(ratingJob?ratingJob.propertyId||ratingJob.propertyName:"");
+                    var link="app.turnready.app/review?job="+(ratingJob?ratingJob.id:"")+"&prop="+(ratingJob?ratingJob.propertyId||ratingJob.propertyName:"");
                     if(navigator.clipboard)navigator.clipboard.writeText(link);
                     setGuestLinkCopied(true);setTimeout(function(){setGuestLinkCopied(false);},2000);
                   }} style={{flex:1,background:guestLinkCopied?"#22C55E":"#3B82F6",border:"none",borderRadius:8,padding:"9px",color:"#FFF",fontSize:11,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif",letterSpacing:.3}}>
                     {guestLinkCopied?"✓ COPIED!":"COPY LINK"}
                   </button>
                   {navigator&&navigator.share&&<button onClick={function(){
-                    var link="turnready.app/review?job="+(ratingJob?ratingJob.id:"")+"&prop="+(ratingJob?ratingJob.propertyId||ratingJob.propertyName:"");
+                    var link="app.turnready.app/review?job="+(ratingJob?ratingJob.id:"")+"&prop="+(ratingJob?ratingJob.propertyId||ratingJob.propertyName:"");
                     navigator.share({title:"Rate your stay",text:"How clean was your rental? Leave a quick review:",url:"https://"+link});
                   }} style={{flex:1,background:"transparent",border:"1px solid #3B82F6",borderRadius:8,padding:"9px",color:"#3B82F6",fontSize:11,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif",letterSpacing:.3}}>SHARE</button>}
                 </div>
