@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="theme-color" content="#0D0D0D"/>
+  <title>Rate Your Stay — TurnReady</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#0D0D0D;color:#FFF;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+    .card{background:#1A1A1A;border:1px solid #2A2A2A;border-radius:16px;padding:28px;width:100%;max-width:420px;}
+    .logo{text-align:center;margin-bottom:24px;}
+    .logo span:first-child{font-size:28px;font-weight:900;letter-spacing:1px;color:#FFF;font-family:Arial Black,sans-serif;}
+    .logo span:last-child{font-size:28px;font-weight:900;letter-spacing:1px;color:#CC0000;font-family:Arial Black,sans-serif;}
+    h1{font-size:20px;font-weight:900;text-align:center;margin-bottom:6px;font-family:Arial Black,sans-serif;letter-spacing:.5px;}
+    .sub{font-size:13px;color:#888;text-align:center;margin-bottom:12px;line-height:1.6;}
+    .why{font-size:11px;color:#666;text-align:center;margin-bottom:24px;line-height:1.6;background:#141414;border:1px solid #2A2A2A;border-radius:8px;padding:10px 12px;}
+    .stars{display:flex;justify-content:center;gap:4px;margin-bottom:20px;}
+    .star{font-size:26px;cursor:pointer;transition:transform .15s;opacity:.3;border:none;background:none;padding:2px;}
+    .star.active{opacity:1;transform:scale(1.1);}
+    .label{text-align:center;font-size:14px;font-weight:700;margin-bottom:16px;min-height:20px;color:#F59E0B;}
+    textarea{width:100%;background:#141414;border:1px solid #2A2A2A;border-radius:10px;color:#FFF;font-size:13px;padding:12px;outline:none;resize:none;font-family:inherit;line-height:1.6;margin-bottom:16px;}
+    textarea:focus{border-color:#CC0000;}
+    button.submit{width:100%;background:#CC0000;border:none;border-radius:10px;padding:14px;color:#FFF;font-size:14px;font-weight:900;font-family:Arial Black,sans-serif;letter-spacing:.5px;cursor:pointer;}
+    button.submit:disabled{background:#2A2A2A;color:#555;cursor:default;}
+    .success{text-align:center;padding:20px 0;}
+    .success .emoji{font-size:52px;margin-bottom:16px;}
+    .success h2{font-size:20px;font-weight:900;font-family:Arial Black,sans-serif;letter-spacing:.5px;margin-bottom:8px;}
+    .success p{font-size:13px;color:#888;line-height:1.6;}
+    .powered{text-align:center;margin-top:20px;font-size:11px;color:#444;}
+  </style>
+</head>
+<body>
+  <div class="logo"><span>TURN</span><span>READY</span></div>
+  <div class="card" id="form-card">
+    <h1>HOW WAS YOUR STAY?</h1>
+    <p class="sub">Rate the cleanliness of your rental. Your feedback helps us maintain 5-star standards.</p>
+    <p class="why">This is separate from your Airbnb review — it goes directly to our cleaning team so we can recognize great work and fix issues fast.</p>
+    <div class="stars" id="stars">
+      <button class="star" data-val="1">⭐</button>
+      <button class="star" data-val="2">⭐</button>
+      <button class="star" data-val="3">⭐</button>
+      <button class="star" data-val="4">⭐</button>
+      <button class="star" data-val="5">⭐</button>
+    </div>
+    <div class="label" id="label"></div>
+    <textarea id="comment" rows="4" placeholder="Tell us more (optional) — what stood out, what could be better..."></textarea>
+    <button class="submit" id="submit-btn" disabled onclick="submitReview()">TAP A STAR TO RATE</button>
+  </div>
+  <p class="powered">Powered by TurnReady · Professional Cleaning Management</p>
+
+  <script>
+    var rating = 0;
+    var labels = ["","😞 Poor","😐 Below Average","🙂 Average","😊 Good","⭐ Excellent!"];
+    var stars = document.querySelectorAll('.star');
+
+    stars.forEach(function(star) {
+      star.addEventListener('click', function() {
+        rating = parseInt(this.dataset.val);
+        stars.forEach(function(s, i) {
+          s.classList.toggle('active', i < rating);
+        });
+        document.getElementById('label').textContent = labels[rating];
+        var btn = document.getElementById('submit-btn');
+        btn.disabled = false;
+        btn.textContent = 'SUBMIT MY RATING';
+      });
+    });
+
+    function submitReview() {
+      var comment = document.getElementById('comment').value.trim();
+      var params = new URLSearchParams(window.location.search);
+      var jobId = params.get('job') || '';
+      var propId = params.get('prop') || '';
+
+      // Save to localStorage so manager can see it
+      try {
+        var key = 'turnready_guest_review_' + (propId || jobId);
+        var reviews = JSON.parse(localStorage.getItem(key) || '[]');
+        reviews.push({
+          rating: rating,
+          comment: comment,
+          date: new Date().toISOString(),
+          jobId: jobId,
+          propId: propId
+        });
+        localStorage.setItem(key, JSON.stringify(reviews));
+      } catch(e) {}
+
+      // Show success
+      document.getElementById('form-card').innerHTML = '<div class="success"><div class="emoji">🙏</div><h2>THANK YOU!</h2><p>Your rating has been submitted.<br/>We appreciate your feedback and will use it to keep improving our cleaning standards.</p></div>';
+    }
+  </script>
+</body>
+</html>
