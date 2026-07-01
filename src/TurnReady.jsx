@@ -1882,17 +1882,16 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                       <div style={{position:"relative",flexShrink:0,width:80,height:80}}>
                         <div onClick={function(){
                           var ov=document.createElement("div");
-                          ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;";
-                          ov.onclick=function(e){if(e.target===ov)document.body.removeChild(ov);};
-                          var vid=document.createElement("video");vid.src=r.refVideo;vid.controls=true;vid.autoplay=true;
-                          vid.style.cssText="max-width:95vw;max-height:85vh;border-radius:8px;";
+                          ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:16px;";
+                          var vid=document.createElement("video");vid.src=r.refVideo;vid.controls=true;vid.autoplay=true;vid.playsInline=true;
+                          vid.style.cssText="max-width:95vw;max-height:80vh;border-radius:8px;";
                           ov.appendChild(vid);
                           var cl=document.createElement("button");cl.textContent="✕ Close";
-                          cl.style.cssText="margin-top:16px;background:rgba(255,255,255,.15);border:none;color:#FFF;font-size:14px;padding:8px 20px;border-radius:20px;cursor:pointer;";
+                          cl.style.cssText="margin-top:12px;background:rgba(255,255,255,.2);border:none;color:#FFF;font-size:14px;padding:10px 24px;border-radius:20px;cursor:pointer;";
                           cl.onclick=function(){document.body.removeChild(ov);};
                           ov.appendChild(cl);document.body.appendChild(ov);
                         }} style={{cursor:"pointer",width:80,height:80,position:"relative"}}>
-                          <video src={r.refVideo} style={{width:80,height:80,borderRadius:8,objectFit:"cover",display:"block"}}/>
+                          <video src={r.refVideo} style={{width:80,height:80,borderRadius:8,objectFit:"cover",display:"block",pointerEvents:"none"}}/>
                           <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,.3)",borderRadius:8,pointerEvents:"none"}}>
                             <span style={{fontSize:20,color:"#FFF"}}>▶</span>
                           </div>
@@ -1933,8 +1932,8 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                           close.onclick=function(){document.body.removeChild(overlay);};
                           overlay.appendChild(close);document.body.appendChild(overlay);
                         }}>
-                          <video src={r.video} controls style={{width:"100%",borderRadius:8,maxHeight:180,marginBottom:4}}/>
-                          <div style={{fontSize:10,color:"#22C55E",fontWeight:600,textAlign:"center",marginBottom:4}}>Tap to fullscreen</div>
+                          <video src={r.video} style={{width:"100%",borderRadius:8,maxHeight:180,marginBottom:4,pointerEvents:"none"}}/>
+                          <div style={{fontSize:10,color:"#22C55E",fontWeight:600,textAlign:"center",marginBottom:4}}>▶ Tap to view fullscreen</div>
                         </div>
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
                           <div style={{fontSize:10,color:"#888"}}>{r.videoName||"After-clean video"}</div>
