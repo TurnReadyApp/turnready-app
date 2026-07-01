@@ -667,7 +667,7 @@ function AIChat({onClose,user}){
     setLoading(true);
     var userContent=mediaPreview&&mediaPreview.type==="image"?[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:mediaPreview.url.split(",")[1]||""}},{type:"text",text:q||"What do you see? Give cleaning advice."}]:q;
     try{
-      var res=await fetch("/.netlify/functions/ai",{
+      var res=await fetch("/api/ai",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
