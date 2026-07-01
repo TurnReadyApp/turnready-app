@@ -2283,6 +2283,16 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
             </div>:<div style={{fontSize:13,fontWeight:500}}>{prop.bedrooms} bed / {prop.bathrooms%1===0.5?Math.floor(prop.bathrooms)+"½":prop.bathrooms} bath</div>}
           </div>
 
+          {/* Linen Bag Rate */}
+          <div style={{padding:"9px 0",borderBottom:"1px solid "+(C.border)}}>
+            <div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>Linen Bag Rate ($ per bag)</div>
+            <div style={{fontSize:10,color:"#666",marginBottom:4}}>Amount paid to cleaner per bag of linens taken home</div>
+            {editingInfo?<input type="number" min="0" defaultValue={prop.linenRate||10} placeholder="e.g. 10"
+              onBlur={function(e){var v=Number(e.target.value)||10;setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{linenRate:v});});});}}
+              style={{width:"100%",boxSizing:"border-box",background:"#2A2A2A",border:"1px solid #444",borderRadius:6,color:"#FFF",fontSize:13,padding:"6px 8px",outline:"none"}}/>
+            :<div style={{fontSize:13,fontWeight:500,color:"#3B82F6"}}>${prop.linenRate||10} per bag</div>}
+          </div>
+
           {/* Total Beds (mattresses) field */}
           <div style={{padding:"9px 0",borderBottom:"1px solid "+(C.border)}}>
             <div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>Total Beds (Mattresses)</div>
@@ -2480,6 +2490,95 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
     {id:"tmpl2",name:"2BR / 3BR Standard",icon:"🏡",color:"#22C55E",tasks:[{id:"t1",section:"Arrival",label:"Turn on lights, fans, and all TVs — note what's not working",done:false},{id:"t2",section:"Arrival",label:"Walk the entire property once before touching anything",done:false},{id:"t3",section:"Arrival",label:"Check high-risk areas: kitchen, bathrooms, beds, patio",done:false},{id:"t4",section:"Arrival",label:"Look for hair buildup, stains, odors, broken items, or signs of a party",done:false},{id:"t5",section:"Arrival",label:"Photo/video any damage or heavy mess — notify Harvey if significant",done:false},{id:"t6",section:"Living & Dining",label:"Vacuum sofa, chairs, and under all furniture — check edges and corners",done:false},{id:"t7",section:"Living & Dining",label:"Fluff and align all cushions and throw pillows per staging guide",done:false},{id:"t8",section:"Living & Dining",label:"Wipe coffee table, side tables, and TV stand",done:false},{id:"t9",section:"Living & Dining",label:"Clean TV screen streak-free — wipe remotes and place neatly",done:false},{id:"t10",section:"Living & Dining",label:"Dust all eye-level surfaces: shelves, décor, blinds, windowsills",done:false},{id:"t11",section:"Living & Dining",label:"Wipe dining table (top, edges, legs) and align chairs evenly",done:false},{id:"t12",section:"Living & Dining",label:"Sanitize light switches and door handles",done:false},{id:"t13",section:"Living & Dining",label:"Mop hard floors — check corners and baseboards",done:false},{id:"t14",section:"Living & Dining",label:"FINAL CHECK: Furniture matches staging photos?",done:false},{id:"t15",section:"Kitchen",label:"Wipe countertops and backsplash spotless — no grease, crumbs, or streaks",done:false},{id:"t16",section:"Kitchen",label:"Clean sink, faucet, and handles — no odors or water spots",done:false},{id:"t17",section:"Kitchen",label:"Empty fridge of all guest food — wipe shelves, no spills or odors",done:false},{id:"t18",section:"Kitchen",label:"Clean microwave inside and out — no splatter",done:false},{id:"t19",section:"Kitchen",label:"Degrease stovetop and burner area — wipe control knobs",done:false},{id:"t20",section:"Kitchen",label:"Empty dishwasher — check filter, wipe door inside and out",done:false},{id:"t21",section:"Kitchen",label:"Wipe cabinet fronts — open all cabinets and drawers, check for crumbs",done:false},{id:"t22",section:"Kitchen",label:"Clean coffee maker, empty toaster, wipe all small appliances",done:false},{id:"t23",section:"Kitchen",label:"Remove trash, reline bin, sweep and mop floors including corners",done:false},{id:"t24",section:"Kitchen",label:"FINAL CHECK: Would you confidently cook and eat here right now?",done:false},{id:"t25",section:"Bathrooms",label:"Clean mirror streak-free — no water marks or fingerprints",done:false},{id:"t26",section:"Bathrooms",label:"Scrub sink basin spotless — polish faucet and handles",done:false},{id:"t27",section:"Bathrooms",label:"Scrub toilet fully: inside bowl, seat top and bottom, hinges, and base",done:false},{id:"t28",section:"Bathrooms",label:"Scrub shower walls and tub — no soap scum, hair in drain, or mildew",done:false},{id:"t29",section:"Bathrooms",label:"Check drawers and under-sink — wipe out hair, dust, or residue",done:false},{id:"t30",section:"Bathrooms",label:"Restock amenities: soap, shampoo, conditioner, TP folded to a point",done:false},{id:"t31",section:"Bathrooms",label:"Stage hand towels: clean, folded evenly, and centered",done:false},{id:"t32",section:"Bathrooms",label:"Sanitize light switches, door handles — wipe wall marks",done:false},{id:"t33",section:"Bathrooms",label:"Vacuum and mop floors — check corners and edges for hair",done:false},{id:"t34",section:"Bathrooms",label:"FINAL CHECK: Would you confidently shower and leave your items here?",done:false},{id:"t35",section:"Bedrooms",label:"Strip all beds — bag all used linens separately",done:false},{id:"t36",section:"Bedrooms",label:"Remake beds: sheets tight and wrinkle-free, pillows fluffed and squared",done:false},{id:"t37",section:"Bedrooms",label:"Check mattress fully covered — no hair on bedding or headboard",done:false},{id:"t38",section:"Bedrooms",label:"Dust all surfaces: headboard, nightstands, dressers, lamps, mirrors",done:false},{id:"t39",section:"Bedrooms",label:"Open all drawers and closets — check for guest items or debris",done:false},{id:"t40",section:"Bedrooms",label:"Sanitize light switches — wipe any wall marks",done:false},{id:"t41",section:"Bedrooms",label:"Vacuum floors thoroughly — including under-bed area and closet floor",done:false},{id:"t42",section:"Bedrooms",label:"Dust windowsills, blinds, and straighten curtains",done:false},{id:"t43",section:"Bedrooms",label:"FINAL CHECK: Would you sleep here tonight?",done:false},{id:"t44",section:"Patio & Outdoor",label:"Remove all trash, food residue, cups, or debris",done:false},{id:"t45",section:"Patio & Outdoor",label:"Sweep all walking areas — check for safety hazards",done:false},{id:"t46",section:"Patio & Outdoor",label:"Wipe furniture: tables, chairs, armrests, cushions",done:false},{id:"t47",section:"Patio & Outdoor",label:"Clean and cover grill — check propane is off",done:false},{id:"t48",section:"Patio & Outdoor",label:"Arrange furniture neatly per staging guide",done:false},{id:"t49",section:"Patio & Outdoor",label:"FINAL CHECK: Would guests feel comfortable relaxing here immediately?",done:false},{id:"t50",section:"Departure",label:"Full walkthrough completed as a guest",done:false},{id:"t51",section:"Departure",label:"All room standards passed: Kitchen, Bath, Bedrooms, Living Areas",done:false},{id:"t52",section:"Departure",label:"No missed hair, crumbs, odors, or staging issues",done:false},{id:"t53",section:"Departure",label:"All linens clean, folded, and stored properly",done:false},{id:"t54",section:"Departure",label:"Dishwasher empty",done:false},{id:"t55",section:"Departure",label:"Washer door cracked open",done:false},{id:"t56",section:"Departure",label:"Dryer lint trap cleaned",done:false},{id:"t57",section:"Departure",label:"Trash removed to exterior bins",done:false},{id:"t58",section:"Departure",label:"Thermostat set to host standard (Heat/AC: 73°)",done:false},{id:"t59",section:"Departure",label:"Ceiling fans set to low",done:false},{id:"t60",section:"Departure",label:"Overhead lights off",done:false},{id:"t61",section:"Departure",label:"Porch / exterior lights on",done:false},{id:"t62",section:"Departure",label:"Supply closets locked",done:false},{id:"t63",section:"Departure",label:"All exterior doors and windows locked",done:false},{id:"t64",section:"Departure",label:"Keys returned to proper location",done:false},{id:"t65",section:"Departure",label:"✅ I approve this unit for immediate guest check-in",done:false}]},
     {id:"tmpl3",name:"4BR+ Large Home",icon:"🏰",color:"#F59E0B",tasks:[{id:"t1",section:"Arrival",label:"Turn on lights, fans, and all TVs — note what's not working",done:false},{id:"t2",section:"Arrival",label:"Walk the entire property once before touching anything",done:false},{id:"t3",section:"Arrival",label:"Check high-risk areas: kitchen, bathrooms, beds, patio",done:false},{id:"t4",section:"Arrival",label:"Look for hair buildup, stains, odors, broken items, or signs of a party",done:false},{id:"t5",section:"Arrival",label:"Photo/video any damage or heavy mess — notify Harvey if significant",done:false},{id:"t6",section:"Living & Dining",label:"Vacuum sofa, chairs, and under all furniture — check edges and corners",done:false},{id:"t7",section:"Living & Dining",label:"Fluff and align all cushions and throw pillows per staging guide",done:false},{id:"t8",section:"Living & Dining",label:"Wipe coffee table, side tables, and TV stand",done:false},{id:"t9",section:"Living & Dining",label:"Clean TV screen streak-free — wipe remotes and place neatly",done:false},{id:"t10",section:"Living & Dining",label:"Dust all eye-level surfaces: shelves, décor, blinds, windowsills",done:false},{id:"t11",section:"Living & Dining",label:"Wipe dining table (top, edges, legs) and align chairs evenly",done:false},{id:"t12",section:"Living & Dining",label:"Sanitize light switches and door handles",done:false},{id:"t13",section:"Living & Dining",label:"Mop hard floors — check corners and baseboards",done:false},{id:"t14",section:"Living & Dining",label:"FINAL CHECK: Furniture matches staging photos?",done:false},{id:"t15",section:"Kitchen",label:"Wipe countertops and backsplash spotless — no grease, crumbs, or streaks",done:false},{id:"t16",section:"Kitchen",label:"Clean sink, faucet, and handles — no odors or water spots",done:false},{id:"t17",section:"Kitchen",label:"Empty fridge of all guest food — wipe shelves, no spills or odors",done:false},{id:"t18",section:"Kitchen",label:"Clean microwave inside and out — no splatter",done:false},{id:"t19",section:"Kitchen",label:"Degrease stovetop and burner area — wipe control knobs",done:false},{id:"t20",section:"Kitchen",label:"Empty dishwasher — check filter, wipe door inside and out",done:false},{id:"t21",section:"Kitchen",label:"Wipe cabinet fronts — open all cabinets and drawers, check for crumbs",done:false},{id:"t22",section:"Kitchen",label:"Clean coffee maker, empty toaster, wipe all small appliances",done:false},{id:"t23",section:"Kitchen",label:"Remove trash, reline bin, sweep and mop floors including corners",done:false},{id:"t24",section:"Kitchen",label:"FINAL CHECK: Would you confidently cook and eat here right now?",done:false},{id:"t25",section:"Bathrooms",label:"Clean mirror streak-free — no water marks or fingerprints",done:false},{id:"t26",section:"Bathrooms",label:"Scrub sink basin spotless — polish faucet and handles",done:false},{id:"t27",section:"Bathrooms",label:"Scrub toilet fully: inside bowl, seat top and bottom, hinges, and base",done:false},{id:"t28",section:"Bathrooms",label:"Scrub shower walls and tub — no soap scum, hair in drain, or mildew",done:false},{id:"t29",section:"Bathrooms",label:"Check drawers and under-sink — wipe out hair, dust, or residue",done:false},{id:"t30",section:"Bathrooms",label:"Restock amenities: soap, shampoo, conditioner, TP folded to a point",done:false},{id:"t31",section:"Bathrooms",label:"Stage hand towels: clean, folded evenly, and centered",done:false},{id:"t32",section:"Bathrooms",label:"Sanitize light switches, door handles — wipe wall marks",done:false},{id:"t33",section:"Bathrooms",label:"Vacuum and mop floors — check corners and edges for hair",done:false},{id:"t34",section:"Bathrooms",label:"FINAL CHECK: Would you confidently shower and leave your items here?",done:false},{id:"t35",section:"Bedrooms",label:"Strip all beds — bag all used linens separately",done:false},{id:"t36",section:"Bedrooms",label:"Remake beds: sheets tight and wrinkle-free, pillows fluffed and squared",done:false},{id:"t37",section:"Bedrooms",label:"Check mattress fully covered — no hair on bedding or headboard",done:false},{id:"t38",section:"Bedrooms",label:"Dust all surfaces: headboard, nightstands, dressers, lamps, mirrors",done:false},{id:"t39",section:"Bedrooms",label:"Open all drawers and closets — check for guest items or debris",done:false},{id:"t40",section:"Bedrooms",label:"Sanitize light switches — wipe any wall marks",done:false},{id:"t41",section:"Bedrooms",label:"Vacuum floors thoroughly — including under-bed area and closet floor",done:false},{id:"t42",section:"Bedrooms",label:"Dust windowsills, blinds, and straighten curtains",done:false},{id:"t43",section:"Bedrooms",label:"FINAL CHECK: Would you sleep here tonight?",done:false},{id:"t44",section:"Patio & Outdoor",label:"Remove all trash, food residue, cups, or debris",done:false},{id:"t45",section:"Patio & Outdoor",label:"Sweep all walking areas — check for safety hazards",done:false},{id:"t46",section:"Patio & Outdoor",label:"Wipe furniture: tables, chairs, armrests, cushions",done:false},{id:"t47",section:"Patio & Outdoor",label:"Clean and cover grill — check propane is off",done:false},{id:"t48",section:"Patio & Outdoor",label:"Arrange furniture neatly per staging guide",done:false},{id:"t49",section:"Patio & Outdoor",label:"FINAL CHECK: Would guests feel comfortable relaxing here immediately?",done:false},{id:"t50",section:"Departure",label:"Full walkthrough completed as a guest",done:false},{id:"t51",section:"Departure",label:"All room standards passed: Kitchen, Bath, Bedrooms, Living Areas",done:false},{id:"t52",section:"Departure",label:"No missed hair, crumbs, odors, or staging issues",done:false},{id:"t53",section:"Departure",label:"All linens clean, folded, and stored properly",done:false},{id:"t54",section:"Departure",label:"Dishwasher empty",done:false},{id:"t55",section:"Departure",label:"Washer door cracked open",done:false},{id:"t56",section:"Departure",label:"Dryer lint trap cleaned",done:false},{id:"t57",section:"Departure",label:"Trash removed to exterior bins",done:false},{id:"t58",section:"Departure",label:"Thermostat set to host standard (Heat/AC: 73°)",done:false},{id:"t59",section:"Departure",label:"Ceiling fans set to low",done:false},{id:"t60",section:"Departure",label:"Overhead lights off",done:false},{id:"t61",section:"Departure",label:"Porch / exterior lights on",done:false},{id:"t62",section:"Departure",label:"Supply closets locked",done:false},{id:"t63",section:"Departure",label:"All exterior doors and windows locked",done:false},{id:"t64",section:"Departure",label:"Keys returned to proper location",done:false},{id:"t65",section:"Departure",label:"✅ I approve this unit for immediate guest check-in",done:false}]},
     {id:"tmpl4",name:"Same-Day Rapid Turn",icon:"🔥",color:"#CC0000",tasks:[{id:"t1",section:"Arrival",label:"Turn on lights, fans, and all TVs — note what's not working",done:false},{id:"t2",section:"Arrival",label:"Walk the entire property once before touching anything",done:false},{id:"t3",section:"Arrival",label:"Check high-risk areas: kitchen, bathrooms, beds, patio",done:false},{id:"t4",section:"Arrival",label:"Look for hair buildup, stains, odors, broken items, or signs of a party",done:false},{id:"t5",section:"Arrival",label:"Photo/video any damage or heavy mess — notify Harvey if significant",done:false},{id:"t6",section:"Living & Dining",label:"Vacuum sofa, chairs, and under all furniture — check edges and corners",done:false},{id:"t7",section:"Living & Dining",label:"Fluff and align all cushions and throw pillows per staging guide",done:false},{id:"t8",section:"Living & Dining",label:"Wipe coffee table, side tables, and TV stand",done:false},{id:"t9",section:"Living & Dining",label:"Clean TV screen streak-free — wipe remotes and place neatly",done:false},{id:"t10",section:"Living & Dining",label:"Dust all eye-level surfaces: shelves, décor, blinds, windowsills",done:false},{id:"t11",section:"Living & Dining",label:"Wipe dining table (top, edges, legs) and align chairs evenly",done:false},{id:"t12",section:"Living & Dining",label:"Sanitize light switches and door handles",done:false},{id:"t13",section:"Living & Dining",label:"Mop hard floors — check corners and baseboards",done:false},{id:"t14",section:"Living & Dining",label:"FINAL CHECK: Furniture matches staging photos?",done:false},{id:"t15",section:"Kitchen",label:"Wipe countertops and backsplash spotless — no grease, crumbs, or streaks",done:false},{id:"t16",section:"Kitchen",label:"Clean sink, faucet, and handles — no odors or water spots",done:false},{id:"t17",section:"Kitchen",label:"Empty fridge of all guest food — wipe shelves, no spills or odors",done:false},{id:"t18",section:"Kitchen",label:"Clean microwave inside and out — no splatter",done:false},{id:"t19",section:"Kitchen",label:"Degrease stovetop and burner area — wipe control knobs",done:false},{id:"t20",section:"Kitchen",label:"Empty dishwasher — check filter, wipe door inside and out",done:false},{id:"t21",section:"Kitchen",label:"Wipe cabinet fronts — open all cabinets and drawers, check for crumbs",done:false},{id:"t22",section:"Kitchen",label:"Clean coffee maker, empty toaster, wipe all small appliances",done:false},{id:"t23",section:"Kitchen",label:"Remove trash, reline bin, sweep and mop floors including corners",done:false},{id:"t24",section:"Kitchen",label:"FINAL CHECK: Would you confidently cook and eat here right now?",done:false},{id:"t25",section:"Bathrooms",label:"Clean mirror streak-free — no water marks or fingerprints",done:false},{id:"t26",section:"Bathrooms",label:"Scrub sink basin spotless — polish faucet and handles",done:false},{id:"t27",section:"Bathrooms",label:"Scrub toilet fully: inside bowl, seat top and bottom, hinges, and base",done:false},{id:"t28",section:"Bathrooms",label:"Scrub shower walls and tub — no soap scum, hair in drain, or mildew",done:false},{id:"t29",section:"Bathrooms",label:"Check drawers and under-sink — wipe out hair, dust, or residue",done:false},{id:"t30",section:"Bathrooms",label:"Restock amenities: soap, shampoo, conditioner, TP folded to a point",done:false},{id:"t31",section:"Bathrooms",label:"Stage hand towels: clean, folded evenly, and centered",done:false},{id:"t32",section:"Bathrooms",label:"Sanitize light switches, door handles — wipe wall marks",done:false},{id:"t33",section:"Bathrooms",label:"Vacuum and mop floors — check corners and edges for hair",done:false},{id:"t34",section:"Bathrooms",label:"FINAL CHECK: Would you confidently shower and leave your items here?",done:false},{id:"t35",section:"Bedrooms",label:"Strip all beds — bag all used linens separately",done:false},{id:"t36",section:"Bedrooms",label:"Remake beds: sheets tight and wrinkle-free, pillows fluffed and squared",done:false},{id:"t37",section:"Bedrooms",label:"Check mattress fully covered — no hair on bedding or headboard",done:false},{id:"t38",section:"Bedrooms",label:"Dust all surfaces: headboard, nightstands, dressers, lamps, mirrors",done:false},{id:"t39",section:"Bedrooms",label:"Open all drawers and closets — check for guest items or debris",done:false},{id:"t40",section:"Bedrooms",label:"Sanitize light switches — wipe any wall marks",done:false},{id:"t41",section:"Bedrooms",label:"Vacuum floors thoroughly — including under-bed area and closet floor",done:false},{id:"t42",section:"Bedrooms",label:"Dust windowsills, blinds, and straighten curtains",done:false},{id:"t43",section:"Bedrooms",label:"FINAL CHECK: Would you sleep here tonight?",done:false},{id:"t44",section:"Patio & Outdoor",label:"Remove all trash, food residue, cups, or debris",done:false},{id:"t45",section:"Patio & Outdoor",label:"Sweep all walking areas — check for safety hazards",done:false},{id:"t46",section:"Patio & Outdoor",label:"Wipe furniture: tables, chairs, armrests, cushions",done:false},{id:"t47",section:"Patio & Outdoor",label:"Clean and cover grill — check propane is off",done:false},{id:"t48",section:"Patio & Outdoor",label:"Arrange furniture neatly per staging guide",done:false},{id:"t49",section:"Patio & Outdoor",label:"FINAL CHECK: Would guests feel comfortable relaxing here immediately?",done:false},{id:"t50",section:"Departure",label:"Full walkthrough completed as a guest",done:false},{id:"t51",section:"Departure",label:"All room standards passed: Kitchen, Bath, Bedrooms, Living Areas",done:false},{id:"t52",section:"Departure",label:"No missed hair, crumbs, odors, or staging issues",done:false},{id:"t53",section:"Departure",label:"All linens clean, folded, and stored properly",done:false},{id:"t54",section:"Departure",label:"Dishwasher empty",done:false},{id:"t55",section:"Departure",label:"Washer door cracked open",done:false},{id:"t56",section:"Departure",label:"Dryer lint trap cleaned",done:false},{id:"t57",section:"Departure",label:"Trash removed to exterior bins",done:false},{id:"t58",section:"Departure",label:"Thermostat set to host standard (Heat/AC: 73°)",done:false},{id:"t59",section:"Departure",label:"Ceiling fans set to low",done:false},{id:"t60",section:"Departure",label:"Overhead lights off",done:false},{id:"t61",section:"Departure",label:"Porch / exterior lights on",done:false},{id:"t62",section:"Departure",label:"Supply closets locked",done:false},{id:"t63",section:"Departure",label:"All exterior doors and windows locked",done:false},{id:"t64",section:"Departure",label:"Keys returned to proper location",done:false},{id:"t65",section:"Departure",label:"✅ I approve this unit for immediate guest check-in",done:false}]},
+    {id:"tmpl_deep",name:"STR Deep Clean",icon:"🧹",color:"#8B5CF6",tasks:[
+      {id:"dc_pre1",section:"Pre-Clean Walkthrough",label:"Walk entire home first — note heavy buildup, damage, stains, missing items",done:false},
+      {id:"dc_pre2",section:"Pre-Clean Walkthrough",label:"Check vents, ceiling corners, baseboards, blinds, and doors throughout",done:false},
+      {id:"dc_pre3",section:"Pre-Clean Walkthrough",label:"Check under all furniture and inside all cabinets, drawers, and closets",done:false},
+      {id:"dc_pre4",section:"Pre-Clean Walkthrough",label:"Check all light fixtures, ceiling fans, switch plates, and window tracks",done:false},
+      {id:"dc_pre5",section:"Pre-Clean Walkthrough",label:"Check walls for marks, dust, smudges — check floors along edges and corners",done:false},
+      {id:"dc_b1",section:"Bedroom Deep Clean",label:"Strip beds — dust ceiling corners, fan blades, air vents, and light fixtures",done:false},
+      {id:"dc_b2",section:"Bedroom Deep Clean",label:"Dust curtain rods, blind tops, headboards, and top edges of all furniture",done:false},
+      {id:"dc_b3",section:"Bedroom Deep Clean",label:"Dust wall art, mirrors, window sills, and window frames",done:false},
+      {id:"dc_b4",section:"Bedroom Deep Clean",label:"Deep clean closet — dust top shelf, wipe rods, shelves, inside corners, vacuum floor edges",done:false},
+      {id:"dc_b5",section:"Bedroom Deep Clean",label:"Wipe dresser tops, fronts, sides, handles — wipe inside drawers",done:false},
+      {id:"dc_b6",section:"Bedroom Deep Clean",label:"Wipe nightstands inside and out — clean behind and under them",done:false},
+      {id:"dc_b7",section:"Bedroom Deep Clean",label:"Vacuum under bed fully — check bed frame slats and support edges for dust buildup",done:false},
+      {id:"dc_b8",section:"Bedroom Deep Clean",label:"Inspect and vacuum mattress surface — wipe bed frame, rails, and footboard",done:false},
+      {id:"dc_b9",section:"Bedroom Deep Clean",label:"Clean mirrors — spot clean wall marks — wipe door front, back, edges, light switches, outlet covers",done:false},
+      {id:"dc_b10",section:"Bedroom Deep Clean",label:"Vacuum entire floor including edges, under bed, closet, and under furniture — mop if hard floor",done:false},
+      {id:"dc_b11",section:"Bedroom Deep Clean",label:"Remake bed neatly — return furniture — final eye-level and floor-level inspection",done:false},
+      {id:"dc_bth1",section:"Bathroom Deep Clean",label:"Remove trash, bath mats, towels, and all items from counters and shower/tub",done:false},
+      {id:"dc_bth2",section:"Bathroom Deep Clean",label:"Dust exhaust vent cover, ceiling corners, light fixtures, top of mirror frame and cabinet edges",done:false},
+      {id:"dc_bth3",section:"Bathroom Deep Clean",label:"Apply cleaner to tub, shower walls, door, fixtures, corners, and grout — let dwell",done:false},
+      {id:"dc_bth4",section:"Bathroom Deep Clean",label:"Scrub tiles and grout lines, soap scum from walls and tub, around drain and corners",done:false},
+      {id:"dc_bth5",section:"Bathroom Deep Clean",label:"Remove residue from shower door tracks — wipe and polish fixtures — clean shower glass",done:false},
+      {id:"dc_bth6",section:"Bathroom Deep Clean",label:"Check for mildew or caulk issues — report if found",done:false},
+      {id:"dc_bth7",section:"Bathroom Deep Clean",label:"Clean toilet — tank top, outside fully, seat top and bottom, rim, bowl interior, base, and behind toilet",done:false},
+      {id:"dc_bth8",section:"Bathroom Deep Clean",label:"Scrub sink bowl and drain — wipe faucet, handles, backsplash, countertop fully",done:false},
+      {id:"dc_bth9",section:"Bathroom Deep Clean",label:"Wipe vanity front, sides, drawers — clean inside drawers and inside cabinet under sink",done:false},
+      {id:"dc_bth10",section:"Bathroom Deep Clean",label:"Check for leaks or water damage under sink — report if found",done:false},
+      {id:"dc_bth11",section:"Bathroom Deep Clean",label:"Clean mirror streak-free — spot clean walls — wipe switches, outlet covers, door, towel bars, baseboards",done:false},
+      {id:"dc_bth12",section:"Bathroom Deep Clean",label:"Vacuum/sweep floor — mop thoroughly — check behind door and around trash can area",done:false},
+      {id:"dc_bth13",section:"Bathroom Deep Clean",label:"Reset towels, mats, toiletries — final smell and shine check on chrome, mirror, floor, and toilet base",done:false},
+      {id:"dc_k1",section:"Kitchen Deep Clean",label:"Remove trash — clear counters — open all cabinets and drawers — pull movable appliances forward if safe",done:false},
+      {id:"dc_k2",section:"Kitchen Deep Clean",label:"Dust ceiling corners, vents, top of cabinets, top of fridge, and light fixtures",done:false},
+      {id:"dc_k3",section:"Kitchen Deep Clean",label:"Wipe cabinet fronts, handles, edges, and sides — clean inside upper and lower cabinets",done:false},
+      {id:"dc_k4",section:"Kitchen Deep Clean",label:"Wipe inside drawers — remove crumbs — clean under sink cabinet floor and walls — check for leaks, pests",done:false},
+      {id:"dc_k5",section:"Kitchen Deep Clean",label:"Scrub countertops fully — remove grease and sticky residue — clean backsplash and corners",done:false},
+      {id:"dc_k6",section:"Kitchen Deep Clean",label:"Wipe around small appliances and under canisters, trays, and coffee station items",done:false},
+      {id:"dc_k7",section:"Kitchen Deep Clean",label:"Scrub sink basin, edges, rim, faucet, handles, and drain — remove water spots",done:false},
+      {id:"dc_k8",section:"Kitchen Deep Clean",label:"OVEN — clean exterior, door, handle, inside door glass, interior walls, bottom, racks, and storage drawer",done:false},
+      {id:"dc_k9",section:"Kitchen Deep Clean",label:"MICROWAVE — clean exterior, handle, buttons, and inside top/sides/bottom and turntable",done:false},
+      {id:"dc_k10",section:"Kitchen Deep Clean",label:"FRIDGE — clean exterior, handles, top, sides, inside shelves, drawers, bins, and door shelves — wipe gaskets",done:false},
+      {id:"dc_k11",section:"Kitchen Deep Clean",label:"FRIDGE — clean behind and under if safe — FREEZER — clean inside shelves, remove ice residue, wipe door edges",done:false},
+      {id:"dc_k12",section:"Kitchen Deep Clean",label:"DISHWASHER — clean exterior, controls, door edges, inside door, check and clear filter, wipe racks",done:false},
+      {id:"dc_k13",section:"Kitchen Deep Clean",label:"Wipe baseboards, kick plates, corners — clean under and behind trash can area",done:false},
+      {id:"dc_k14",section:"Kitchen Deep Clean",label:"Vacuum and mop floor thoroughly — hit all edges, corners, and under table and chairs",done:false},
+      {id:"dc_k15",section:"Kitchen Deep Clean",label:"Return items neatly — make sink, faucet, and all appliance fronts shine — final check from doorway",done:false},
+      {id:"dc_lr1",section:"Living Room Deep Clean",label:"Remove trash — remove sofa cushions — move lightweight décor and small furniture",done:false},
+      {id:"dc_lr2",section:"Living Room Deep Clean",label:"Dust ceiling corners, ceiling fan, vents, light fixtures, curtain rods, and blind tops",done:false},
+      {id:"dc_lr3",section:"Living Room Deep Clean",label:"Dust shelves, frames, wall art — wipe coffee table, side tables, TV stand top/front/sides",done:false},
+      {id:"dc_lr4",section:"Living Room Deep Clean",label:"Dust electronics carefully — wipe lamps, lamp bases, décor, trays, remote holders",done:false},
+      {id:"dc_lr5",section:"Living Room Deep Clean",label:"Vacuum under sofa cushions, creases, seams — check for crumbs, hair, and wrappers",done:false},
+      {id:"dc_lr6",section:"Living Room Deep Clean",label:"Vacuum under sofa — spot clean sofa stains if approved — wipe leather/vinyl if applicable",done:false},
+      {id:"dc_lr7",section:"Living Room Deep Clean",label:"Check and clean behind TV stand and behind sofa if accessible — clean baseboards behind furniture",done:false},
+      {id:"dc_lr8",section:"Living Room Deep Clean",label:"Clean window sills and tracks — spot clean walls — wipe switches, outlets, and door handles",done:false},
+      {id:"dc_lr9",section:"Living Room Deep Clean",label:"Vacuum rug and hard floor edges — vacuum under furniture — mop hard floors — check corners",done:false},
+      {id:"dc_lr10",section:"Living Room Deep Clean",label:"Replace sofa cushions — fluff pillows — align décor — final eye-level and floor-level check",done:false},
+      {id:"dc_dr1",section:"Dining Room Deep Clean",label:"Clear table — move chairs out — dust light fixture/chandelier, vents, wall décor, window sills and blinds",done:false},
+      {id:"dc_dr2",section:"Dining Room Deep Clean",label:"Wipe table top, underside of edges, legs, and base — wipe all chair backs, seats, legs, and lower bars",done:false},
+      {id:"dc_dr3",section:"Dining Room Deep Clean",label:"Check chair corners for buildup — clean baseboards and corners — spot clean walls — wipe switches",done:false},
+      {id:"dc_dr4",section:"Dining Room Deep Clean",label:"Sweep/vacuum under table and chairs — mop floor — check for sticky spots — return chairs evenly",done:false},
+      {id:"dc_la1",section:"Laundry Area Deep Clean",label:"Dust shelf above machines, vents — wipe top, control panels, fronts, sides, and doors of washer and dryer",done:false},
+      {id:"dc_la2",section:"Laundry Area Deep Clean",label:"WASHER — wipe inside door/lid, rubber gasket, detergent tray and opening — check for mildew or odor",done:false},
+      {id:"dc_la3",section:"Laundry Area Deep Clean",label:"DRYER — clean lint trap and slot — wipe inside door, drum edge, hinges, and seals",done:false},
+      {id:"dc_la4",section:"Laundry Area Deep Clean",label:"DRYER VENT — inspect accessible vent — remove lint buildup — report blockage, damage, or fire hazard",done:false},
+      {id:"dc_la5",section:"Laundry Area Deep Clean",label:"Wipe shelves, cabinets, behind detergent bottles — wipe baseboards and corners — mop floor",done:false},
+      {id:"dc_ha1",section:"Hallways & Entry Deep Clean",label:"Dust ceiling corners, vents, light fixtures, wall art, and frames",done:false},
+      {id:"dc_ha2",section:"Hallways & Entry Deep Clean",label:"Wipe handrails, banisters, stair spindles — wipe switches, outlets, doors, handles — spot clean walls",done:false},
+      {id:"dc_ha3",section:"Hallways & Entry Deep Clean",label:"Vacuum stair edges, corners, and baseboards — mop hard stairs — vacuum/mop entry flooring",done:false},
+      {id:"dc_ha4",section:"Hallways & Entry Deep Clean",label:"Straighten mats and entry décor — final first-impression check",done:false},
+      {id:"dc_sc1",section:"Supply Closet & Linen Storage",label:"Empty closet — remove all linens, towels, and supplies — check for moisture, mildew, or pests — report",done:false},
+      {id:"dc_sc2",section:"Supply Closet & Linen Storage",label:"Dust ceiling corners, vent covers, top shelf, light fixture, and door frame",done:false},
+      {id:"dc_sc3",section:"Supply Closet & Linen Storage",label:"Wipe all shelves top to bottom including undersides, corners, and edges — dry completely",done:false},
+      {id:"dc_sc4",section:"Supply Closet & Linen Storage",label:"Wipe closet walls, baseboards, door front and back, handles, and light switch",done:false},
+      {id:"dc_sc5",section:"Supply Closet & Linen Storage",label:"Vacuum floor, corners, edges, and under shelving — mop if hard floor",done:false},
+      {id:"dc_sc6",section:"Supply Closet & Linen Storage",label:"Inspect all linens — check for stains, hair, and lint — remove damaged — report low stock",done:false},
+      {id:"dc_sc7",section:"Supply Closet & Linen Storage",label:"Fold all towels and linens uniformly — organize by type on proper shelves — rotate old to front",done:false},
+      {id:"dc_sc8",section:"Supply Closet & Linen Storage",label:"Organize supplies by zone — no chemicals touching linens — bottles upright and lids closed",done:false},
+      {id:"dc_sc9",section:"Supply Closet & Linen Storage",label:"Inventory check — count toilet paper, paper towels, trash bags, soap, cloths, gloves — report low stock",done:false},
+      {id:"dc_fin1",section:"Final Deep Clean Inspection",label:"No visible dust on top surfaces",done:false},
+      {id:"dc_fin2",section:"Final Deep Clean Inspection",label:"No hair or debris in corners",done:false},
+      {id:"dc_fin3",section:"Final Deep Clean Inspection",label:"Baseboards visibly cleaner throughout entire property",done:false},
+      {id:"dc_fin4",section:"Final Deep Clean Inspection",label:"Inside cabinets, cupboards, drawers cleaned",done:false},
+      {id:"dc_fin5",section:"Final Deep Clean Inspection",label:"Inside oven, dishwasher, fridge, and freezer cleaned",done:false},
+      {id:"dc_fin6",section:"Final Deep Clean Inspection",label:"Top of fridge cleaned — under beds cleaned — inside closets cleaned",done:false},
+      {id:"dc_fin7",section:"Final Deep Clean Inspection",label:"Under bathroom sinks cleaned — under sofa cushions cleaned",done:false},
+      {id:"dc_fin8",section:"Final Deep Clean Inspection",label:"Dryer lint area and accessible vent cleaned",done:false},
+      {id:"dc_fin9",section:"Final Deep Clean Inspection",label:"Floors finished and edges detailed throughout",done:false},
+      {id:"dc_fin10",section:"Final Deep Clean Inspection",label:"All rooms reset neatly — damage and maintenance issues documented",done:false},
+      {id:"dc_fin11",section:"Final Deep Clean Inspection",label:"✅ Deep clean complete — property is fully restored to baseline standard",done:false},
+    ]},
   ]);
   useEffect(function(){if(initialSel){setSel(initialSel);onClearSel&&onClearSel();};},[initialSel]);
   const [assignTarget,setAssignTarget]=useState(null);
@@ -2535,6 +2634,7 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
       pay2:twoCleanerData?twoCleanerData.pay2:null,
       split1:twoCleanerData?twoCleanerData.split1:null,
       split2:twoCleanerData?twoCleanerData.split2:null,
+      deepClean:twoCleanerData?twoCleanerData.deepClean:false,
     };
     setProps(function(ps){return ps.map(function(pp){
       if(pp.id!==propId)return pp;
@@ -2670,6 +2770,7 @@ function AssignModal({prop,cleaners,availability,onAssign,onClose}){
   const [assigned,setAssigned]=useState(false);
   const [splitType,setSplitType]=useState("50/50");
   const [customSplit,setCustomSplit]=useState("50");
+  const [isDeepClean,setIsDeepClean]=useState(false);
   const [date,setDate]=useState(prop.scheduledDate||"");
   const [time,setTime]=useState(prop.scheduledTime||"11:00");
 
@@ -2750,6 +2851,19 @@ function AssignModal({prop,cleaners,availability,onAssign,onClose}){
           })()}
         </div>
 
+        {/* Deep Clean Toggle */}
+        <div style={{marginBottom:12}}>
+          <button onClick={function(){setIsDeepClean(!isDeepClean);}}
+            style={{width:"100%",background:isDeepClean?"rgba(139,92,246,.15)":"transparent",border:"1.5px solid "+(isDeepClean?"#8B5CF6":"#333"),borderRadius:8,padding:"10px 14px",color:isDeepClean?"#8B5CF6":"#888",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"Arial Black,sans-serif",letterSpacing:.3}}>
+            {isDeepClean?"🧹 DEEP CLEAN ASSIGNED":"🧹 MARK AS DEEP CLEAN?"}
+          </button>
+          {isDeepClean&&(
+            <div style={{background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.2)",borderRadius:6,padding:"8px 12px",marginTop:6,fontSize:11,color:"#8B5CF6",lineHeight:1.5}}>
+              ✓ Deep clean checklist will be added to this job. Cleaner will see a 🧹 DEEP CLEAN banner.
+            </div>
+          )}
+        </div>
+
         {/* Two cleaners toggle */}
         <div style={{marginBottom:12}}>
           <button onClick={function(){setTwoCleaners(!twoCleaners);if(!twoCleaners)setCid2("");}}
@@ -2812,7 +2926,7 @@ function AssignModal({prop,cleaners,availability,onAssign,onClose}){
             var avCheck=availability&&availability[cid];
             if(avCheck&&date&&((avCheck.blockedDays||[]).includes(new Date(date+"T12:00:00").getDay())||(avCheck.blockedDates||[]).includes(date)))return;
             if(twoCleaners&&cid2){var avCheck2=availability&&availability[cid2];if(avCheck2&&date&&((avCheck2.blockedDays||[]).includes(new Date(date+"T12:00:00").getDay())||(avCheck2.blockedDates||[]).includes(date)))return;}
-            onAssign(prop.id, cid, date, time, twoCleaners?{cid2:cid2,pay1:pay1,pay2:pay2,split1:split1,split2:split2}:null);
+            onAssign(prop.id, cid, date, time, {cid2:twoCleaners?cid2:null,pay1:pay1,pay2:pay2,split1:split1,split2:split2,deepClean:isDeepClean});
             setAssigned(true);
             setTimeout(function(){onClose();},1800);
           }} style={(function(){
@@ -3655,6 +3769,9 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
   });
   // no sort - preserve stable prop/slot order
   const [reviewJob,setReviewJob]=useState(null);
+  const [tipAmount,setTipAmount]=useState(0);
+  const [customTip,setCustomTip]=useState("");
+  const [showCustomTip,setShowCustomTip]=useState(false);
   const [ratingJob,setRatingJob]=useState(null);
   const [managerRating,setManagerRating]=useState(0);
   const [managerComment,setManagerComment]=useState("");
@@ -4002,8 +4119,46 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
               )}
             </div>
             <div style={{background:"#1A1A1A",borderRadius:10,padding:14,marginBottom:14}}>
-              <div style={{fontSize:11,color:"#888",textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>Payout</div>
-              <div style={{fontFamily:"Arial Black,sans-serif",fontSize:28,color:C.red,letterSpacing:1}}>{fmt(reviewJob.pay)}</div>
+              <div style={{fontSize:11,color:"#888",textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>Payout Breakdown</div>
+              {(function(){
+                var prop2=(props||[]).find(function(p){return p.id===reviewJob.propertyId||p.name===reviewJob.propertyName;})||{};
+                var linenBags=prop2.linenBags||0;
+                var linenRate=prop2.linenRate||10;
+                var linenExtra=linenBags*linenRate;
+                return(
+                  <div>
+                    {/* Base pay row */}
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,paddingBottom:8,borderBottom:"1px solid #2A2A2A"}}>
+                      <span style={{fontSize:12,color:"#AAA"}}>Base Pay</span>
+                      <span style={{fontFamily:"Arial Black,sans-serif",fontSize:18,fontWeight:900,color:C.red}}>{fmt(reviewJob.pay)}</span>
+                    </div>
+                    {/* Linen bags */}
+                    {linenBags>0&&(
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,paddingBottom:8,borderBottom:"1px solid #2A2A2A"}}>
+                        <div>
+                          <div style={{fontSize:12,color:"#AAA"}}>🛍️ Linen Bags ({linenBags} × ${linenRate})</div>
+                          {(prop2.linenBagPhotos||[]).length>0&&(
+                            <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                              {(prop2.linenBagPhotos||[]).map(function(ph,i){
+                                var isVid=ph.startsWith("data:video");
+                                return isVid?
+                                  <video key={i} src={ph} style={{width:44,height:44,borderRadius:4,objectFit:"cover"}}/>:
+                                  <img key={i} src={ph} style={{width:44,height:44,borderRadius:4,objectFit:"cover"}}/>;
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <span style={{fontFamily:"Arial Black,sans-serif",fontSize:16,fontWeight:900,color:"#3B82F6"}}>${linenExtra.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {/* Total */}
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(34,197,94,.08)",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+                      <span style={{fontSize:13,fontWeight:700,color:"#FFF"}}>Total Payout</span>
+                      <span style={{fontFamily:"Arial Black,sans-serif",fontSize:22,fontWeight:900,color:"#22C55E"}}>${(reviewJob.pay+linenExtra).toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             {reviewJob.tasks&&reviewJob.tasks.length>0&&(
               <div style={{background:"#1A1A1A",borderRadius:10,padding:14,marginBottom:14}}>
@@ -4112,11 +4267,59 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
                 </div>
               );
             })()}
+            {/* Tip selector */}
+            {(function(){
+              var prop2=(props||[]).find(function(p){return p.id===reviewJob.propertyId||p.name===reviewJob.propertyName;})||{};
+              var linenExtra=(prop2.linenBags||0)*(prop2.linenRate||10);
+              var finalTip=showCustomTip?Number(customTip)||0:tipAmount;
+              var totalNow=reviewJob.pay+linenExtra+finalTip;
+              return(
+                <div style={{background:"#1A1A1A",borderRadius:10,padding:14,marginBottom:12,border:"1px solid #2A2A2A"}}>
+                  <div style={{fontSize:11,color:"#888",textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>💝 Add a Tip?</div>
+                  <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+                    {[0,5,10,20,50].map(function(amt){
+                      var isActive=!showCustomTip&&tipAmount===amt;
+                      return(
+                        <button key={amt} onClick={function(){setTipAmount(amt);setShowCustomTip(false);setCustomTip("");}}
+                          style={{flex:1,padding:"8px 4px",borderRadius:8,border:"1px solid "+(isActive?"#22C55E":"#333"),background:isActive?"rgba(34,197,94,.15)":"transparent",color:isActive?"#22C55E":"#888",fontSize:11,fontWeight:700,cursor:"pointer",minWidth:44}}>
+                          {amt===0?"None":"$"+amt}
+                        </button>
+                      );
+                    })}
+                    <button onClick={function(){setShowCustomTip(true);setTipAmount(0);}}
+                      style={{flex:1,padding:"8px 4px",borderRadius:8,border:"1px solid "+(showCustomTip?"#22C55E":"#333"),background:showCustomTip?"rgba(34,197,94,.15)":"transparent",color:showCustomTip?"#22C55E":"#888",fontSize:11,fontWeight:700,cursor:"pointer",minWidth:44}}>
+                      ✏️
+                    </button>
+                  </div>
+                  {showCustomTip&&(
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                      <span style={{color:"#888",fontSize:16}}>$</span>
+                      <input type="number" value={customTip} onChange={function(e){setCustomTip(e.target.value);}}
+                        placeholder="Enter tip amount"
+                        autoFocus
+                        style={{flex:1,background:"#0D0D0D",border:"1px solid #22C55E",borderRadius:8,color:"#FFF",fontSize:16,fontWeight:700,padding:"8px 12px",outline:"none"}}/>
+                    </div>
+                  )}
+                  {finalTip>0&&(
+                    <div style={{background:"rgba(34,197,94,.08)",borderRadius:6,padding:"6px 10px",fontSize:11,color:"#22C55E",fontWeight:700}}>
+                      💝 Tip: ${finalTip.toFixed(2)} · Total will be ${totalNow.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div style={{display:"flex",gap:8,marginTop:8}}>
-              <button onClick={function(){setRejectJob(reviewJob);setRejectReason("");setRejectCustom("");setReviewJob(null);}}
+              <button onClick={function(){setRejectJob(reviewJob);setRejectReason("");setRejectCustom("");setReviewJob(null);setTipAmount(0);setCustomTip("");setShowCustomTip(false);}}
                 style={{flex:1,background:"transparent",border:"1px solid #EF4444",borderRadius:8,padding:"10px",color:"#EF4444",fontSize:11,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif"}}>REJECT</button>
-              <button onClick={function(){approve(reviewJob.id);}}
-                style={{flex:2,background:C.red,border:"none",borderRadius:8,padding:"10px",color:"#FFF",fontSize:11,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif"}}>APPROVE & PAY {fmt(reviewJob.pay)}</button>
+              <button onClick={function(){
+                var prop2=(props||[]).find(function(p){return p.id===reviewJob.propertyId||p.name===reviewJob.propertyName;})||{};
+                var linenExtra=(prop2.linenBags||0)*(prop2.linenRate||10);
+                var finalTip=showCustomTip?Number(customTip)||0:tipAmount;
+                reviewJob.pay=reviewJob.pay+linenExtra+finalTip;
+                approve(reviewJob.id);
+                setTipAmount(0);setCustomTip("");setShowCustomTip(false);
+              }}
+                style={{flex:2,background:C.red,border:"none",borderRadius:8,padding:"10px",color:"#FFF",fontSize:11,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif"}}>APPROVE & PAY</button>
             </div>
           </div>
         </div>
@@ -4748,11 +4951,14 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
     // Update slot status to in_progress AND clear inventory/task statuses for fresh start
     setProps(function(ps){return ps.map(function(pp){
       if(pp.id!==prop.id)return pp;
+      // Check if this is a deep clean job
+      var mySlot=(pp.schedule||[]).find(function(s){return (s.cleanerId===user.id||s.cleanerId2===user.id)&&(s.status==="accepted"||s.status==="pending_acceptance");});
+      var isDeepCleanJob=mySlot&&mySlot.deepClean;
+      var deepCleanTasks=isDeepCleanJob?[{id:"dc1",section:"Deep Clean — Kitchen",label:"Clean inside oven completely — remove racks, scrub walls and bottom",done:false},{id:"dc2",section:"Deep Clean — Kitchen",label:"Pull out fridge and stove — clean behind and underneath",done:false},{id:"dc3",section:"Deep Clean — Kitchen",label:"Clean inside fridge completely — all shelves, drawers, and door panels",done:false},{id:"dc4",section:"Deep Clean — Kitchen",label:"Degrease exhaust hood and filters",done:false},{id:"dc5",section:"Deep Clean — Kitchen",label:"Clean inside all cabinets and drawers — remove everything, wipe, replace",done:false},{id:"dc6",section:"Deep Clean — Kitchen",label:"Descale coffee maker and clean all small appliances thoroughly",done:false},{id:"dc7",section:"Deep Clean — Bathrooms",label:"Scrub grout lines on all tile walls and floors",done:false},{id:"dc8",section:"Deep Clean — Bathrooms",label:"Remove and deep clean showerhead — remove mineral deposits",done:false},{id:"dc9",section:"Deep Clean — Bathrooms",label:"Clean behind and around toilet base completely",done:false},{id:"dc10",section:"Deep Clean — Bathrooms",label:"Wipe down all baseboards in bathrooms",done:false},{id:"dc11",section:"Deep Clean — Bathrooms",label:"Clean exhaust fan cover and vent",done:false},{id:"dc12",section:"Deep Clean — Bedrooms",label:"Flip or rotate all mattresses",done:false},{id:"dc13",section:"Deep Clean — Bedrooms",label:"Vacuum all mattresses and box springs",done:false},{id:"dc14",section:"Deep Clean — Bedrooms",label:"Clean all mirrors and glass surfaces streak-free",done:false},{id:"dc15",section:"Deep Clean — Bedrooms",label:"Wipe down all furniture including undersides and backs",done:false},{id:"dc16",section:"Deep Clean — Bedrooms",label:"Clean all window tracks and sills inside",done:false},{id:"dc17",section:"Deep Clean — Living Areas",label:"Clean ceiling fans blades top and bottom",done:false},{id:"dc18",section:"Deep Clean — Living Areas",label:"Wipe down all light fixtures and lampshades",done:false},{id:"dc19",section:"Deep Clean — Living Areas",label:"Clean all blinds — wipe each slat individually",done:false},{id:"dc20",section:"Deep Clean — Living Areas",label:"Wipe all baseboards throughout the entire property",done:false},{id:"dc21",section:"Deep Clean — Living Areas",label:"Clean all door frames, handles, and hinges",done:false},{id:"dc22",section:"Deep Clean — Living Areas",label:"Clean all vents and air return covers",done:false},{id:"dc23",section:"Deep Clean — Living Areas",label:"Spot clean all walls — remove marks, scuffs, fingerprints",done:false},{id:"dc24",section:"Deep Clean — Floors",label:"Move all furniture — clean floors completely underneath",done:false},{id:"dc25",section:"Deep Clean — Floors",label:"Scrub all grout lines on hard floors",done:false},{id:"dc26",section:"Deep Clean — Floors",label:"Steam clean or deep vacuum all carpets",done:false},{id:"dc27",section:"Deep Clean — Floors",label:"Clean all floor edges and corners thoroughly",done:false},{id:"dc28",section:"Deep Clean — Final",label:"✅ Deep clean complete — property is reset to baseline standard",done:false}]:[];
+      var baseTasks=(pp.tasks||[]).map(function(t){return Object.assign({},t,{done:false});});
       return Object.assign({},pp,{
-        // Clear inventory cleanerStatus for fresh job
         inventory:(pp.inventory||[]).map(function(i){return Object.assign({},i,{cleanerStatus:null});}),
-        // Uncheck all tasks
-        tasks:(pp.tasks||[]).map(function(t){return Object.assign({},t,{done:false});}),
+        tasks:baseTasks.concat(deepCleanTasks),
         schedule:(pp.schedule||[]).map(function(s){
           return s.cleanerId===user.id&&(s.status==="accepted"||s.status==="pending_acceptance")?Object.assign({},s,{status:"in_progress",startedAt:new Date().toISOString()}):s;
         })
@@ -4911,6 +5117,21 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
         <button onClick={function(){setActiveId(null);setActiveTab("tasks");}} style={{background:"none",border:"none",color:C.red,fontSize:13,cursor:"pointer",padding:"0 0 14px 0",fontWeight:600}}>{"← Back to My Jobs"}</button>
         <div style={{fontFamily:"Arial Black,sans-serif",fontSize:18,fontWeight:900,letterSpacing:1,marginBottom:4}}>{prop.name}</div>
         <div style={{fontSize:12,color:C.muted,marginBottom:16}}>{prop.address}</div>
+
+        {/* Deep Clean Banner */}
+        {(function(){
+          var mySlotDC=(prop.schedule||[]).find(function(s){return (s.cleanerId===user.id||s.cleanerId2===user.id)&&s.deepClean;});
+          if(!mySlotDC)return null;
+          return(
+            <div style={{background:"rgba(139,92,246,.12)",border:"1.5px solid rgba(139,92,246,.5)",borderRadius:10,padding:"12px 14px",marginBottom:12,display:"flex",gap:10,alignItems:"flex-start"}}>
+              <span style={{fontSize:22,flexShrink:0}}>🧹</span>
+              <div>
+                <div style={{fontFamily:"Arial Black,sans-serif",fontSize:12,fontWeight:900,color:"#8B5CF6",letterSpacing:.5,marginBottom:3}}>DEEP CLEAN JOB</div>
+                <div style={{fontSize:11,color:"#CCC",lineHeight:1.6}}>This is a full deep clean. Complete the regular checklist AND the Deep Clean checklist. This resets the property to baseline standard.</div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Same-Day Alert */}
         {prop.sameDay&&(
@@ -5414,6 +5635,51 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                 placeholder={started?"e.g. Found crack in bathroom mirror. Back door doesn't lock properly. Washer needs repair...":"Start the job first to add notes"}
                 rows={4}
                 style={{width:"100%",background:"#1A1A1A",border:"1px solid "+(started?"#2A2A2A":"#111"),borderRadius:8,color:started?"#FFF":"#555",fontSize:12,padding:"10px 12px",outline:"none",resize:"vertical",fontFamily:"Inter,sans-serif",lineHeight:1.6,boxSizing:"border-box",opacity:started?1:.6}}/>
+              {/* Linen Bags Section */}
+              <div style={{marginBottom:16,background:"rgba(59,130,246,.06)",border:"1px solid rgba(59,130,246,.2)",borderRadius:10,padding:"12px 14px"}}>
+                <div style={{fontFamily:"Arial Black,sans-serif",fontSize:11,fontWeight:900,color:"#3B82F6",letterSpacing:.5,marginBottom:4}}>🛍️ LINEN BAGS TAKEN HOME</div>
+                <div style={{fontSize:11,color:"#888",marginBottom:10,lineHeight:1.5}}>Enter how many bags of linens you are taking home. Upload a photo or video as proof.</div>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                  <button onClick={function(){if(!started)return;var cur=prop.linenBags||0;if(cur>0)setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{linenBags:cur-1});});});}}
+                    style={{width:36,height:36,borderRadius:"50%",background:"#1A1A1A",border:"1px solid #333",color:"#FFF",fontSize:20,cursor:started?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>−</button>
+                  <div style={{flex:1,textAlign:"center"}}>
+                    <div style={{fontFamily:"Arial Black,sans-serif",fontSize:28,fontWeight:900,color:"#3B82F6"}}>{prop.linenBags||0}</div>
+                    <div style={{fontSize:10,color:"#888"}}>bag{(prop.linenBags||0)!==1?"s":""}</div>
+                  </div>
+                  <button onClick={function(){if(!started)return;var cur=prop.linenBags||0;setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{linenBags:cur+1});});});}}
+                    style={{width:36,height:36,borderRadius:"50%",background:"#3B82F6",border:"none",color:"#FFF",fontSize:20,cursor:started?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>+</button>
+                </div>
+                {(prop.linenBags||0)>0&&(
+                  <div style={{marginTop:6}}>
+                    <div style={{fontSize:10,color:"#888",marginBottom:6}}>Upload proof photo/video of the bags:</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                      {(prop.linenBagPhotos||[]).map(function(ph,i){
+                        var isVid=ph.startsWith("data:video");
+                        return(
+                          <div key={i} style={{position:"relative",flexShrink:0}}>
+                            {isVid?<video src={ph} style={{width:70,height:70,borderRadius:6,objectFit:"cover"}}/>:<img src={ph} style={{width:70,height:70,borderRadius:6,objectFit:"cover"}}/>}
+                            <button onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;var ph2=(p.linenBagPhotos||[]).filter(function(_,j){return j!==i;});return Object.assign({},p,{linenBagPhotos:ph2});});});}}
+                              style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:"50%",background:"#EF4444",border:"none",color:"#FFF",fontSize:9,cursor:"pointer",fontWeight:900}}>×</button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #3B82F6",borderRadius:6,padding:"6px",cursor:started?"pointer":"not-allowed",fontSize:10,color:"#3B82F6",opacity:started?1:.5}}>
+                        📸 Photo
+                        <input type="file" accept="image/*" capture="environment" disabled={!started} style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
+                          onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{linenBagPhotos:(p.linenBagPhotos||[]).concat([ev.target.result])});});});};r.readAsDataURL(f);}}/>
+                      </label>
+                      <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #3B82F6",borderRadius:6,padding:"6px",cursor:started?"pointer":"not-allowed",fontSize:10,color:"#3B82F6",opacity:started?1:.5}}>
+                        🎬 Video
+                        <input type="file" accept="video/*" capture="environment" disabled={!started} style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
+                          onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{linenBagPhotos:(p.linenBagPhotos||[]).concat([ev.target.result])});});});};r.readAsDataURL(f);}}/>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Photo upload */}
               <div style={{marginTop:12}}>
                 <div style={{fontSize:10,color:C.muted,fontWeight:600,marginBottom:8}}>PROPERTY PHOTOS (optional)</div>
