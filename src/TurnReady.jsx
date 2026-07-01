@@ -859,10 +859,15 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
       <span style={{fontFamily:"Arial Black,Impact,sans-serif",fontSize:"clamp(32px, 9vw, 60px)",fontWeight:900,letterSpacing:0,color:"#CC0000",lineHeight:1}}>READY</span>
     </div>
     <div style={{marginTop:14}}>
-      <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",marginBottom:8}}>
-        {["Assign Jobs","Track Cleans","Stage Properties","Pay Your Team"].map(item=>(
-          <span key={item} style={{fontSize:10,fontWeight:600,color:"#CCC",background:"#1E1E1E",border:"1px solid #333",borderRadius:20,padding:"4px 10px",letterSpacing:.2}}>{item}</span>
-        ))}
+      <div style={{display:"flex",justifyContent:"center",gap:6,marginBottom:6}}>
+        {["Assign Jobs","Track Cleans"].map(function(item){return(
+          <span key={item} style={{fontSize:10,fontWeight:600,color:"#CCC",background:"#1E1E1E",border:"1px solid #333",borderRadius:20,padding:"4px 12px",letterSpacing:.2}}>{item}</span>
+        );})}
+      </div>
+      <div style={{display:"flex",justifyContent:"center",gap:6,marginBottom:6}}>
+        {["Stage Properties","Pay Your Team"].map(function(item){return(
+          <span key={item} style={{fontSize:10,fontWeight:600,color:"#CCC",background:"#1E1E1E",border:"1px solid #333",borderRadius:20,padding:"4px 12px",letterSpacing:.2}}>{item}</span>
+        );})}
       </div>
       <div style={{fontSize:10,color:"#FFFFFF",textAlign:"center",letterSpacing:2,fontWeight:700}}>ALL IN ONE PLACE</div>
     </div>
