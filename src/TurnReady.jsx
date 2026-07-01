@@ -1880,7 +1880,23 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     );})}
                     {r.refVideo&&(
                       <div style={{position:"relative",flexShrink:0,width:80,height:80}}>
-                        <video src={r.refVideo} style={{width:80,height:80,borderRadius:8,objectFit:"cover",display:"block"}}/>
+                        <div onClick={function(){
+                          var ov=document.createElement("div");
+                          ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;";
+                          ov.onclick=function(e){if(e.target===ov)document.body.removeChild(ov);};
+                          var vid=document.createElement("video");vid.src=r.refVideo;vid.controls=true;vid.autoplay=true;
+                          vid.style.cssText="max-width:95vw;max-height:85vh;border-radius:8px;";
+                          ov.appendChild(vid);
+                          var cl=document.createElement("button");cl.textContent="✕ Close";
+                          cl.style.cssText="margin-top:16px;background:rgba(255,255,255,.15);border:none;color:#FFF;font-size:14px;padding:8px 20px;border-radius:20px;cursor:pointer;";
+                          cl.onclick=function(){document.body.removeChild(ov);};
+                          ov.appendChild(cl);document.body.appendChild(ov);
+                        }} style={{cursor:"pointer",width:80,height:80,position:"relative"}}>
+                          <video src={r.refVideo} style={{width:80,height:80,borderRadius:8,objectFit:"cover",display:"block"}}/>
+                          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,.3)",borderRadius:8,pointerEvents:"none"}}>
+                            <span style={{fontSize:20,color:"#FFF"}}>▶</span>
+                          </div>
+                        </div>
                         <button onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:null});})});});});}}
                           style={{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:"50%",background:"#EF4444",border:"none",color:"#FFF",fontSize:10,cursor:"pointer",fontWeight:900}}>x</button>
                       </div>
@@ -1905,7 +1921,21 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     <div style={{fontSize:10,color:"#CC0000",fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>🎥 CLEANER AFTER-CLEAN VIDEO</div>
                     {r.video?(
                       <div>
-                        <video src={r.video} controls style={{width:"100%",borderRadius:8,maxHeight:180,marginBottom:4}}/>
+                        <div style={{position:"relative",cursor:"pointer"}} onClick={function(){
+                          var overlay=document.createElement("div");
+                          overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;";
+                          overlay.onclick=function(e){if(e.target===overlay)document.body.removeChild(overlay);};
+                          var vid=document.createElement("video");vid.src=r.video;vid.controls=true;vid.autoplay=true;
+                          vid.style.cssText="max-width:95vw;max-height:85vh;border-radius:8px;";
+                          overlay.appendChild(vid);
+                          var close=document.createElement("button");close.textContent="✕ Close";
+                          close.style.cssText="margin-top:16px;background:rgba(255,255,255,.15);border:none;color:#FFF;font-size:14px;padding:8px 20px;border-radius:20px;cursor:pointer;";
+                          close.onclick=function(){document.body.removeChild(overlay);};
+                          overlay.appendChild(close);document.body.appendChild(overlay);
+                        }}>
+                          <video src={r.video} controls style={{width:"100%",borderRadius:8,maxHeight:180,marginBottom:4}}/>
+                          <div style={{fontSize:10,color:"#22C55E",fontWeight:600,textAlign:"center",marginBottom:4}}>Tap to fullscreen</div>
+                        </div>
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
                           <div style={{fontSize:10,color:"#888"}}>{r.videoName||"After-clean video"}</div>
                           <button onClick={function(){downloadMedia(r.video,r.videoName||"after-clean-"+r.name+".mp4");}}
