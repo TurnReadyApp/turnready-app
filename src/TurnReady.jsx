@@ -5728,9 +5728,21 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
                   {(prop.cleanerPhotos||[]).map(function(ph,i){
                     return(
-                      <div key={i} style={{position:"relative",flexShrink:0}}>
-                        <img src={ph} alt={"photo "+(i+1)} style={{width:80,height:80,borderRadius:8,objectFit:"cover"}}/>
-                        <button onClick={function(){
+                      <div key={i} style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={function(){
+                        var ov=document.createElement("div");
+                        ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:16px;";
+                        ov.onclick=function(e){if(e.target===ov)document.body.removeChild(ov);};
+                        var img=document.createElement("img");img.src=ph;
+                        img.style.cssText="max-width:95vw;max-height:80vh;object-fit:contain;border-radius:8px;";
+                        ov.appendChild(img);
+                        var cl=document.createElement("button");cl.textContent="✕ Close";
+                        cl.style.cssText="margin-top:12px;background:rgba(255,255,255,.2);border:none;color:#FFF;font-size:14px;padding:10px 24px;border-radius:20px;cursor:pointer;";
+                        cl.onclick=function(){document.body.removeChild(ov);};
+                        ov.appendChild(cl);document.body.appendChild(ov);
+                      }}>
+                        <img src={ph} alt={"photo "+(i+1)} style={{width:80,height:80,borderRadius:8,objectFit:"cover",pointerEvents:"none"}}/>
+                        <button onClick={function(e){
+                          e.stopPropagation();
                           setProps(function(ps){return ps.map(function(p){
                             if(p.id!==prop.id)return p;
                             var photos=(p.cleanerPhotos||[]).filter(function(_,j){return j!==i;});
