@@ -4141,9 +4141,31 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
                             <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
                               {(prop2.linenBagPhotos||[]).map(function(ph,i){
                                 var isVid=ph.startsWith("data:video");
-                                return isVid?
-                                  <video key={i} src={ph} style={{width:44,height:44,borderRadius:4,objectFit:"cover"}}/>:
-                                  <img key={i} src={ph} style={{width:44,height:44,borderRadius:4,objectFit:"cover"}}/>;
+                                function openFull2(){
+                                  var ov=document.createElement("div");
+                                  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:16px;";
+                                  ov.onclick=function(e){if(e.target===ov)document.body.removeChild(ov);};
+                                  if(isVid){var vid=document.createElement("video");vid.src=ph;vid.controls=true;vid.autoplay=true;vid.playsInline=true;vid.style.cssText="max-width:95vw;max-height:80vh;border-radius:8px;";ov.appendChild(vid);}
+                                  else{var img=document.createElement("img");img.src=ph;img.style.cssText="max-width:95vw;max-height:80vh;object-fit:contain;border-radius:8px;";ov.appendChild(img);}
+                                  var cl=document.createElement("button");cl.textContent="✕ Close";
+                                  cl.style.cssText="margin-top:12px;background:rgba(255,255,255,.2);border:none;color:#FFF;font-size:14px;padding:10px 24px;border-radius:20px;cursor:pointer;";
+                                  cl.onclick=function(){document.body.removeChild(ov);};
+                                  ov.appendChild(cl);document.body.appendChild(ov);
+                                }
+                                return(
+                                  <div key={i} style={{position:"relative",cursor:"pointer"}} onClick={openFull2}>
+                                    {isVid?(
+                                      <div style={{width:54,height:54,borderRadius:6,overflow:"hidden",position:"relative"}}>
+                                        <video src={ph} style={{width:"100%",height:"100%",objectFit:"cover",pointerEvents:"none"}}/>
+                                        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,.3)"}}>
+                                          <span style={{fontSize:14,color:"#FFF"}}>▶</span>
+                                        </div>
+                                      </div>
+                                    ):(
+                                      <img src={ph} style={{width:54,height:54,borderRadius:6,objectFit:"cover",pointerEvents:"none"}}/>
+                                    )}
+                                  </div>
+                                );
                               })}
                             </div>
                           )}
@@ -5655,10 +5677,30 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                     <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
                       {(prop.linenBagPhotos||[]).map(function(ph,i){
                         var isVid=ph.startsWith("data:video");
+                        function openFull(){
+                          var ov=document.createElement("div");
+                          ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:16px;";
+                          ov.onclick=function(e){if(e.target===ov)document.body.removeChild(ov);};
+                          if(isVid){var vid=document.createElement("video");vid.src=ph;vid.controls=true;vid.autoplay=true;vid.playsInline=true;vid.style.cssText="max-width:95vw;max-height:80vh;border-radius:8px;";ov.appendChild(vid);}
+                          else{var img=document.createElement("img");img.src=ph;img.style.cssText="max-width:95vw;max-height:80vh;object-fit:contain;border-radius:8px;";ov.appendChild(img);}
+                          var cl=document.createElement("button");cl.textContent="✕ Close";
+                          cl.style.cssText="margin-top:12px;background:rgba(255,255,255,.2);border:none;color:#FFF;font-size:14px;padding:10px 24px;border-radius:20px;cursor:pointer;";
+                          cl.onclick=function(){document.body.removeChild(ov);};
+                          ov.appendChild(cl);document.body.appendChild(ov);
+                        }
                         return(
-                          <div key={i} style={{position:"relative",flexShrink:0}}>
-                            {isVid?<video src={ph} style={{width:70,height:70,borderRadius:6,objectFit:"cover"}}/>:<img src={ph} style={{width:70,height:70,borderRadius:6,objectFit:"cover"}}/>}
-                            <button onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;var ph2=(p.linenBagPhotos||[]).filter(function(_,j){return j!==i;});return Object.assign({},p,{linenBagPhotos:ph2});});});}}
+                          <div key={i} style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={openFull}>
+                            {isVid?(
+                              <div style={{width:70,height:70,borderRadius:6,overflow:"hidden",position:"relative"}}>
+                                <video src={ph} style={{width:"100%",height:"100%",objectFit:"cover",pointerEvents:"none"}}/>
+                                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,.3)"}}>
+                                  <span style={{fontSize:16,color:"#FFF"}}>▶</span>
+                                </div>
+                              </div>
+                            ):(
+                              <img src={ph} style={{width:70,height:70,borderRadius:6,objectFit:"cover",pointerEvents:"none"}}/>
+                            )}
+                            <button onClick={function(e){e.stopPropagation();setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;var ph2=(p.linenBagPhotos||[]).filter(function(_,j){return j!==i;});return Object.assign({},p,{linenBagPhotos:ph2});});});}}
                               style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:"50%",background:"#EF4444",border:"none",color:"#FFF",fontSize:9,cursor:"pointer",fontWeight:900}}>×</button>
                           </div>
                         );
