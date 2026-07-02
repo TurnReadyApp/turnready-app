@@ -4,6 +4,49 @@ import { supabase, signIn, signUp, signOut, getCurrentUser, getTeamCleaners, get
 
 
 
+
+// ─── ERROR BOUNDARY ──────────────────────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("TurnReady crash:", error, errorInfo);
+    this.setState({ errorInfo });
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{minHeight:"100vh",background:"#0D0D0D",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,padding:24}}>
+          <div style={{fontFamily:"Arial Black,sans-serif",fontSize:22,fontWeight:900,letterSpacing:1}}>
+            <span style={{color:"#FFF"}}>TURN</span><span style={{color:"#CC0000"}}>READY</span>
+          </div>
+          <div style={{color:"#EF4444",fontSize:14,fontWeight:700}}>Something went wrong</div>
+          <div style={{background:"#1A1A1A",border:"1px solid #333",borderRadius:10,padding:16,maxWidth:360,width:"100%"}}>
+            <div style={{color:"#EF4444",fontSize:12,fontFamily:"monospace",wordBreak:"break-all",marginBottom:8}}>
+              {this.state.error&&this.state.error.toString()}
+            </div>
+            {this.state.errorInfo&&(
+              <div style={{color:"#666",fontSize:10,fontFamily:"monospace",whiteSpace:"pre-wrap",maxHeight:200,overflow:"auto"}}>
+                {this.state.errorInfo.componentStack}
+              </div>
+            )}
+          </div>
+          <button onClick={()=>window.location.reload()}
+            style={{background:"#CC0000",border:"none",borderRadius:8,color:"#FFF",fontSize:13,fontWeight:700,padding:"10px 24px",cursor:"pointer"}}>
+            Reload App
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ─── BRAND COLORS ────────────────────────────────────────────────────────────
 const DARK_THEME = {
   bg:"#0D0D0D",surface:"#141414",card:"#1A1A1A",border:"#2A2A2A",
@@ -2833,7 +2876,7 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
 
   if(sel){
     var prop=props.find(p=>p.id===sel);
-    return <PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners} user={user}/>;
+    return <ErrorBoundary><PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners} user={user}/></ErrorBoundary>;
   }
 
   return(
@@ -9491,8 +9534,8 @@ export default function App() {
   );
 
   function renderView(){
-    try {
-      if(user.role==="manager"){
+    if(!user)return null;
+    if(user.role==="manager"){
         switch(view){
           case "Dashboard": return <Dashboard props={props} cleaners={cleaners} jobs={jobs} setView={setView} notifications={notifications} onSelectCleaner={(c)=>{setSelectedCleaner(c);setView("Team");}}/>;
           case "Properties": return <Properties props={props} setProps={setProps} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){setNotifications(function(prev){return prev.concat([n]);});}} initialSel={selectedProp} onClearSel={function(){setSelectedProp(null);}}/>;
@@ -9524,12 +9567,6 @@ export default function App() {
           default: return <CleanerDashboard user={user} cleaners={cleaners} jobs={jobs} props={props} setView={setView}/>;
         }
       }
-    } catch(e) {
-      return <div style={{padding:20,color:"#EF4444",fontFamily:"Inter,sans-serif"}}>
-        <div style={{fontWeight:700,marginBottom:8}}>Error in {view}:</div>
-        <div style={{fontSize:12}}>{e.message}</div>
-      </div>;
-    }
   }
 
   return (
