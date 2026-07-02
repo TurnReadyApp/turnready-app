@@ -845,7 +845,11 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
       var data=await signIn({email:email.trim(),password:pwd});
       var profile=await getCurrentUser();
       if(!profile){setErr("Account not found. Please contact your manager.");setLoading(false);return;}
-      try{localStorage.setItem("turnready_bio_email",email);localStorage.setItem("turnready_bio_pwd",pwd);}catch(e){}
+      try{
+        localStorage.setItem("turnready_bio_email",email);
+        localStorage.setItem("turnready_bio_pwd",pwd);
+        localStorage.setItem("turnready_is_real_user","true");
+      }catch(e){}
       setLoading(false);
       onLogin(profile);
     }catch(e){
@@ -1933,15 +1937,27 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                       </div>
                     )}
                   </div>
-                  <div style={{display:"flex",gap:8}}>
-                    <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
-                      📸 Add Photo
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
+                      📷 Camera
+                      <input type="file" accept="image/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
+                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([ev.target.result])});})});});});};reader.readAsDataURL(file);});}}/>
+                    </label>
+                    <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
+                      📸 Gallery
                       <input type="file" accept="image/*" multiple style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
                         onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([ev.target.result])});})});});});};reader.readAsDataURL(file);});}}/>
                     </label>
                     {!r.refVideo&&(
-                      <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
-                        🎬 Add Video
+                      <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
+                        🎬 Record
+                        <input type="file" accept="video/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
+                          onChange={function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev.target.result});})});});});};reader.readAsDataURL(file);}}/>
+                      </label>
+                    )}
+                    {!r.refVideo&&(
+                      <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
+                        📁 Video
                         <input type="file" accept="video/*" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
                           onChange={function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev.target.result});})});});});};reader.readAsDataURL(file);}}/>
                       </label>
@@ -2269,6 +2285,29 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
               style={{background:editingInfo?"#22C55E":"transparent",border:"1px solid "+(editingInfo?"#22C55E":"#444"),borderRadius:6,color:editingInfo?"#FFF":"#888",fontSize:10,fontWeight:700,padding:"5px 12px",cursor:"pointer"}}>
               {editingInfo?"✓ DONE":"✏️ EDIT"}
             </button>
+          </div>
+
+          {/* Property Cover Photo Upload */}
+          <div style={{padding:"9px 0",borderBottom:"1px solid "+(C.border)}}>
+            <div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:.3,marginBottom:8}}>Cover Photo</div>
+            <div style={{position:"relative",width:"100%",borderRadius:10,overflow:"hidden",marginBottom:8}}>
+              <img src={prop.photo||"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80"} alt="cover"
+                style={{width:"100%",height:140,objectFit:"cover",borderRadius:10,display:"block"}}/>
+            </div>
+            {editingInfo&&(
+              <div style={{display:"flex",gap:6}}>
+                <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #444",borderRadius:6,padding:"7px",cursor:"pointer",fontSize:10,color:"#888",fontWeight:700}}>
+                  📷 Take Photo
+                  <input type="file" accept="image/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
+                    onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:ev.target.result});});});};r.readAsDataURL(f);}}/>
+                </label>
+                <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #444",borderRadius:6,padding:"7px",cursor:"pointer",fontSize:10,color:"#888",fontWeight:700}}>
+                  📁 Upload Photo
+                  <input type="file" accept="image/*" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
+                    onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:ev.target.result});});});};r.readAsDataURL(f);}}/>
+                </label>
+              </div>
+            )}
           </div>
 
           <div style={{padding:"9px 0",borderBottom:"1px solid "+(C.border)}}>
@@ -2637,6 +2676,10 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
         {id:"i14",item:"Water",required:12,inStock:12},
         {id:"i15",item:"Laundry Soap",required:1,inStock:1},
         {id:"i16",item:"Bleach",required:1,inStock:1},
+        {id:"i17",item:"Dryer Sheets",required:1,inStock:1},
+        {id:"i18",item:"Fabric Softener",required:1,inStock:1},
+        {id:"i19",item:"Stain Remover",required:1,inStock:1},
+        {id:"i20",item:"Lint Roller",required:1,inStock:1},
       ],
       rooms:[
         {id:"r1",name:"Living Room",icon:"🛋️",guide:"Stage per standard protocol.",clip:"Wide angle of staged living room.",refPhotos:["https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&q=80"],refVideo:null,video:null},
@@ -6381,7 +6424,14 @@ function Messages({user,cleaners,addNotification}){
   const [selCleaner,setSelCleaner]=useState(null);
   const [showBroadcast,setShowBroadcast]=useState(false);
   const [broadcastInput,setBroadcastInput]=useState("");
-  const [msgs,setMsgs]=useState(function(){try{var s=localStorage.getItem("turnready_msgs");return s?JSON.parse(s):{};}catch(e){return {};}});
+  const [msgs,setMsgs]=useState(function(){
+    try{
+      var flag=localStorage.getItem("turnready_is_real_user");
+      if(flag==="true")return {};
+      var s=localStorage.getItem("turnready_msgs");
+      return s?JSON.parse(s):{};
+    }catch(e){return {};}
+  });
   const [input,setInput]=useState("");
   const [mediaPreview,setMediaPreview]=useState(null); // {url, type:'image'|'video', name}
 
@@ -8597,6 +8647,8 @@ export default function App() {
   useEffect(function(){
     getCurrentUser().then(function(profile){
       if(profile){
+        // Mark as real user so demo data doesn't load
+        try{localStorage.setItem("turnready_is_real_user","true");}catch(e){}
         setUser(profile);
         if(profile.role==="cleaner")setView("Home");
         if(profile.role==="manager"){
@@ -8697,13 +8749,23 @@ export default function App() {
     }
   }, [darkMode]);
   const INVITE_CODE = "HARVEY2024";
-  const [props, setProps] = useState(INIT_PROPS);
+  const [props, setProps] = useState(function(){
+    // Only load demo props if no real Supabase session
+    try{
+      var flag=localStorage.getItem("turnready_is_real_user");
+      if(flag==="true")return []; // Real user - start empty, load from Supabase
+      var stored=localStorage.getItem("turnready_shared_props");
+      if(stored){var sp=JSON.parse(stored);if(sp&&sp.length)return sp;}
+    }catch(e){}
+    return INIT_PROPS;
+  });
   const [cleaners, setCleaners] = useState(function(){
     try{
+      var flag=localStorage.getItem("turnready_is_real_user");
+      if(flag==="true")return []; // Real user - load from Supabase
       var stored=localStorage.getItem("turnready_cleaners");
       if(stored){
         var parsed=JSON.parse(stored);
-        // Merge with INIT_CLEANERS to keep demo cleaners
         var initIds=INIT_CLEANERS.map(function(c){return c.id;});
         var extra=parsed.filter(function(c){return initIds.indexOf(c.id)<0;});
         return INIT_CLEANERS.concat(extra);
@@ -8711,10 +8773,25 @@ export default function App() {
     }catch(e){}
     return INIT_CLEANERS;
   });
-  const [jobs, setJobs] = useState(INIT_JOBS);
+  const [jobs, setJobs] = useState(function(){
+    try{
+      var flag=localStorage.getItem("turnready_is_real_user");
+      if(flag==="true")return []; // Real user - start empty
+      var stored=localStorage.getItem("turnready_shared_jobs");
+      if(stored){var sj=JSON.parse(stored);if(sj&&sj.length)return sj;}
+    }catch(e){}
+    return INIT_JOBS;
+  });
   const [pendingRemovals, setPendingRemovals] = useState([]);
   const [pendingCleaners, setPendingCleaners] = useState([]);
-  const [notifications, setNotifications] = useState(function(){try{var s=localStorage.getItem("turnready_notifications");return s?JSON.parse(s):[];}catch(e){return [];}});
+  const [notifications, setNotifications] = useState(function(){
+    try{
+      var flag=localStorage.getItem("turnready_is_real_user");
+      if(flag==="true")return [];
+      var s=localStorage.getItem("turnready_notifications");
+      return s?JSON.parse(s):[];
+    }catch(e){return [];}
+  });
   const [notifRead, setNotifRead] = useState({});
 
   // Persist notifications to localStorage
@@ -9358,13 +9435,14 @@ export default function App() {
           })}
           onLogout={async function(){
             try{await signOut();}catch(e){}
+            try{localStorage.removeItem("turnready_is_real_user");}catch(e){}
             setUser(null);
             setShowOnboarding(false);
             setOnboardingStep("welcome");
             setShowMgrStripe(false);
-            setProps(INIT_PROPS);
+            setProps([]);
             setCleaners(INIT_CLEANERS);
-            setJobs(INIT_JOBS);
+            setJobs([]);
             setNotifications([]);
           }}
           openAI={function(){setShowAI(true);}} onBell={function(){setShowNotifs(true);}} darkMode={darkMode} setDarkMode={function(v){setDarkMode(v);try{localStorage.setItem("turnready_theme",v?"dark":"light");}catch(e){}}}/>
