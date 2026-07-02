@@ -923,6 +923,9 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
         joinedAt:profile.joined_at||profile.created_at,
         photo:profile.photo||null,
         avatar:profile.avatar||null,
+        businessPhone:profile.business_phone||null,
+        businessAddress:profile.business_address||null,
+        emergency:profile.emergency||null,
       });
       onLogin(mappedProfile);
     }catch(e){
@@ -1108,6 +1111,11 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
                     totalEarned:profile.total_earned||0,
                     jobsCompleted:profile.jobs_completed||0,
                     joinedAt:profile.joined_at||new Date().toISOString(),
+                    photo:profile.photo||null,
+                    avatar:profile.avatar||null,
+                    businessPhone:profile.business_phone||null,
+                    businessAddress:profile.business_address||null,
+                    emergency:profile.emergency||null,
                   }):profile;
                   onLogin(mp,true,mp);
                 } else {
@@ -1899,7 +1907,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     setDragTaskId(null);setDragOverTaskId(null);
                   }}
                   onDragEnd={function(){setDragTaskId(null);setDragOverTaskId(null);}}
-                  style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",
+                  style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 0",
                     borderBottom:"1px solid #1A1A1A",
                     background:dragOverTaskId===t.id?"rgba(204,0,0,.12)":"transparent",
                     borderRadius:dragOverTaskId===t.id?6:0,
@@ -4500,7 +4508,7 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
                     <div style={{width:18,height:18,borderRadius:4,flexShrink:0,background:t.done?"#22C55E":"transparent",border:"2px solid "+(t.done?"#22C55E":"#444"),display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {t.done&&<span style={{color:"#FFF",fontSize:10,fontWeight:900}}>✓</span>}
                     </div>
-                    <span style={{fontSize:12,color:t.done?"#FFF":"#666"}}>{t.label}</span>
+                    <span style={{fontSize:12,color:t.done?"#FFF":"#666",flex:1,wordBreak:"break-word",overflowWrap:"break-word",minWidth:0}}>{t.label}</span>
                   </div>
                 );})}
               </div>
@@ -5771,7 +5779,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                           display:"flex",alignItems:"center",justifyContent:"center"}}>
                           {t.done&&<span style={{color:"#FFF",fontSize:12,fontWeight:900}}>✓</span>}
                         </div>
-                        <span style={{fontSize:13,color:t.done?C.muted:C.white,textDecoration:t.done?"line-through":"none"}}>{t.label}</span>
+                        <span style={{fontSize:13,color:t.done?C.muted:C.white,textDecoration:t.done?"line-through":"none",flex:1,wordBreak:"break-word",overflowWrap:"break-word",minWidth:0}}>{t.label}</span>
                       </div>
                     );
                   })}
@@ -6383,7 +6391,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                         {secTasks.map(function(t){return(
                           <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #1A1A1A"}}>
                             <span style={{fontSize:14,color:t.done?"#22C55E":"#444"}}>{t.done?"✓":"○"}</span>
-                            <span style={{fontSize:12,color:t.done?C.offWhite:"#555",textDecoration:t.done?"none":"none"}}>{t.label}</span>
+                            <span style={{fontSize:12,color:t.done?C.offWhite:"#555",textDecoration:"none",flex:1,wordBreak:"break-word",overflowWrap:"break-word",minWidth:0}}>{t.label}</span>
                           </div>
                         );})}
                       </div>
@@ -7518,35 +7526,45 @@ function ProfilePage({user,setUser,cleaners,setCleaners,jobs,setShowMgrStripe}){
         localStorage.setItem("turnready_cleaners",JSON.stringify(existing));
       }catch(e){}
     }
-    setSaved(true);
-    setEditing(false);
-    setTimeout(function(){setSaved(false);},2500);
     // Save to Supabase if real user
     if(user&&user.id&&user.id.length>10){
       var dbUpdates={
         name:updated.name,
         phone:updated.phone||null,
         avatar:updated.avatar||null,
+        emergency:updated.emergency||null,
+        business_name:updated.businessName||null,
+        business_phone:updated.businessPhone||null,
+        business_address:updated.businessAddress||null,
       };
-      if(isManager){
-        dbUpdates.business_name=updated.businessName||null;
-      }
       // Upload profile photo to Supabase Storage (not base64 in DB)
       if(updated.photo&&updated.photo.startsWith("data:image")){
         compressImage(updated.photo,400,400,0.85,function(compressed){
           // Upload to Storage
           uploadImageToStorage("profile-photos","users/"+user.id+"/profile.jpg",compressed).then(function(publicUrl){
             setUser(function(u){return Object.assign({},u,{photo:publicUrl});});
-            updateUserProfile(user.id,Object.assign({},dbUpdates,{photo:publicUrl})).catch(function(e){console.error("Profile save failed:",e.message);});
+            updateUserProfile(user.id,Object.assign({},dbUpdates,{photo:publicUrl})).then(function(){
+              setSaved(true);setEditing(false);setTimeout(function(){setSaved(false);},2500);
+            }).catch(function(e){console.error("Profile save failed:",e.message);setSaved(true);setEditing(false);setTimeout(function(){setSaved(false);},2500);});
           }).catch(function(e){
             console.error("Profile photo upload failed:",e.message);
-            // Fall back to base64
+            // Fall back to saving base64
             updateUserProfile(user.id,Object.assign({},dbUpdates,{photo:compressed})).catch(function(e2){console.error("Profile save failed:",e2.message);});
+            setSaved(true);setEditing(false);setTimeout(function(){setSaved(false);},2500);
           });
         });
       } else {
-        updateUserProfile(user.id,dbUpdates).catch(function(e){console.error("Profile save failed:",e.message);});
+        updateUserProfile(user.id,dbUpdates).then(function(){
+          setSaved(true);setEditing(false);setTimeout(function(){setSaved(false);},2500);
+        }).catch(function(e){
+          console.error("Profile save failed:",e.message);
+          setSaved(true);setEditing(false);setTimeout(function(){setSaved(false);},2500);
+        });
       }
+    } else {
+      setSaved(true);
+      setEditing(false);
+      setTimeout(function(){setSaved(false);},2500);
     }
   }
 
@@ -8994,10 +9012,33 @@ export default function App() {
 
   // Restore session on app load
   useEffect(function(){
+    // Pre-load props cache before auth check to eliminate delay
+    try{
+      var preFlag=localStorage.getItem("turnready_is_real_user");
+      var preSession=localStorage.getItem("turnready_session_user");
+      if(preFlag==="true"&&preSession){
+        var preUser=JSON.parse(preSession);
+        if(preUser&&preUser.id){
+          var preCache=localStorage.getItem("tr_props_"+preUser.id);
+          if(preCache){var preCp=JSON.parse(preCache);if(preCp&&preCp.length)setProps(preCp);}
+        }
+      }
+    }catch(e){}
     getCurrentUser().then(function(profile){
       if(profile){
         // Mark as real user so demo data doesn't load
         try{localStorage.setItem("turnready_is_real_user","true");}catch(e){}
+        // Load notifications from Supabase
+        if(profile.id&&profile.id.length>10){
+          getNotifications(profile.id).then(function(dbNotifs){
+            if(dbNotifs&&dbNotifs.length>0){
+              var mapped=dbNotifs.map(function(n){return Object.assign({},n,{
+                forRole:n.for_role,navTo:n.nav_to,
+              });});
+              setNotifications(mapped);
+            }
+          }).catch(function(e){console.error("Notifications load:",e.message);});
+        }
         // Map DB field names to app field names
         var mappedProfile=Object.assign({},profile,{
           stripeStatus:profile.stripe_status||"pending",
@@ -9010,6 +9051,9 @@ export default function App() {
           joinedAt:profile.joined_at||profile.created_at,
           photo:profile.photo||null,
           avatar:profile.avatar||null,
+          businessPhone:profile.business_phone||null,
+          businessAddress:profile.business_address||null,
+          emergency:profile.emergency||null,
         });
         setUser(mappedProfile);
         try{localStorage.setItem("turnready_session_user",JSON.stringify({id:profile.id,role:profile.role}));}catch(e){}
@@ -9254,15 +9298,8 @@ export default function App() {
           assignedTo:p.assignedTo,
           guest_rating:p.guestRating,
         }).then(function(){
-          // Update cache after successful sync
-          try{
-            var uid=null;
-            try{
-              var s=localStorage.getItem("turnready_session_user");
-              if(s){var u=JSON.parse(s);uid=u&&u.id;}
-            }catch(e){}
-            if(uid)localStorage.setItem("tr_props_"+uid,JSON.stringify(props));
-          }catch(e){}
+          // Update cache after successful sync - use user.id from closure
+          try{localStorage.setItem("tr_props_"+(user&&user.id?user.id:""),JSON.stringify(props));}catch(e){}
         }).catch(function(e){
           console.error("❌ Supabase sync failed for property",p.id,"Error:",e.message,"Code:",e.code);
         });
@@ -9551,6 +9588,7 @@ export default function App() {
                     });
                   });
                   setProps(mapped);
+                  try{localStorage.setItem("tr_props_"+u.id,JSON.stringify(mapped));}catch(e){}
                 } else {
                   // No Supabase data yet - use localStorage or demo
                   try{
@@ -9867,9 +9905,37 @@ export default function App() {
     if(user.role==="manager"){
         switch(view){
           case "Dashboard": return <Dashboard props={props} cleaners={cleaners} jobs={jobs} setView={setView} notifications={notifications} onSelectCleaner={(c)=>{setSelectedCleaner(c);setView("Team");}}/>;
-          case "Properties": return <Properties props={props} setProps={setProps} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){setNotifications(function(prev){return prev.concat([n]);});}} initialSel={selectedProp} onClearSel={function(){setSelectedProp(null);}}/>;
+          case "Properties": return <Properties props={props} setProps={setProps} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){
+              setNotifications(function(prev){return prev.concat([n]);});
+              if(user&&user.id&&user.id.length>10){
+                createNotification({
+                  user_id:n.forCleaner||n.userId||user.id,
+                  type:n.type||"info",
+                  icon:n.icon||"🔔",
+                  title:n.title,
+                  body:n.body||null,
+                  for_role:n.forRole||null,
+                  nav_to:n.navTo||null,
+                  read:false,
+                }).catch(function(e){console.error("Notif save:",e.message);});
+              }
+            }} initialSel={selectedProp} onClearSel={function(){setSelectedProp(null);}}/>;
           case "Team": return <Cleaners cleaners={cleaners} setCleaners={setCleaners} jobs={jobs} pendingCleaners={pendingCleaners} setPendingCleaners={setPendingCleaners} allProps={props} setProps={setProps} user={user} availability={availability} initialSelected={selectedCleaner} onClearSelected={()=>setSelectedCleaner(null)}/>;
-          case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={function(n){setNotifications(function(prev){return prev.concat([n]);});}}/>;
+          case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={function(n){
+              setNotifications(function(prev){return prev.concat([n]);});
+              if(user&&user.id&&user.id.length>10){
+                createNotification({
+                  user_id:n.forCleaner||n.userId||user.id,
+                  type:n.type||"info",
+                  icon:n.icon||"🔔",
+                  title:n.title,
+                  body:n.body||null,
+                  for_role:n.forRole||null,
+                  nav_to:n.navTo||null,
+                  read:false,
+                }).catch(function(e){console.error("Notif save:",e.message);});
+              }
+            }}/>;
           case "Calendar": return <Cal props={props} cleaners={cleaners} setProps={setProps} user={user} setView={setView} onSelectProp={function(id){setSelectedProp(id);setView("Properties");}} availability={availability} setAvailability={setAvailability}/>;
           case "Payroll": return <Payroll cleaners={cleaners} jobs={jobs}/>;
           case "Approvals": return <Approvals jobs={jobs} setJobs={setJobs} props={props} setProps={setProps} cleaners={cleaners} setCleaners={setCleaners} setView={setView} setNotifications={setNotifications} user={user} setShowMgrStripe={setShowMgrStripe} pendingRemovals={pendingRemovals} setPendingRemovals={setPendingRemovals}/>;
@@ -9882,11 +9948,39 @@ export default function App() {
       } else {
         switch(view){
           case "Home": return <CleanerDashboard user={user} cleaners={cleaners} jobs={jobs} props={props} setView={setView}/>;
-          case "My Jobs": return <CleanerJobs user={user} props={props} setProps={setProps} jobs={jobs} setJobs={setJobs} cleaners={cleaners} pendingRemovals={pendingRemovals} setPendingRemovals={setPendingRemovals} addNotification={function(n){setNotifications(function(prev){return prev.concat([n]);});}}/>;
+          case "My Jobs": return <CleanerJobs user={user} props={props} setProps={setProps} jobs={jobs} setJobs={setJobs} cleaners={cleaners} pendingRemovals={pendingRemovals} setPendingRemovals={setPendingRemovals} addNotification={function(n){
+              setNotifications(function(prev){return prev.concat([n]);});
+              if(user&&user.id&&user.id.length>10){
+                createNotification({
+                  user_id:n.forCleaner||n.userId||user.id,
+                  type:n.type||"info",
+                  icon:n.icon||"🔔",
+                  title:n.title,
+                  body:n.body||null,
+                  for_role:n.forRole||null,
+                  nav_to:n.navTo||null,
+                  read:false,
+                }).catch(function(e){console.error("Notif save:",e.message);});
+              }
+            }}/>;
           case "My Earnings": return <CleanerEarnings user={user} cleaners={cleaners} jobs={jobs}/>;
           case "My Ratings": return <CleanerRatings user={user} cleaners={cleaners} jobs={jobs} props={props} setView={setView}/>;
           case "My Availability": return <CleanerAvailability user={user} availability={availability} setAvailability={setAvailability}/>;
-          case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={function(n){setNotifications(function(prev){return prev.concat([n]);});}}/>;
+          case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={function(n){
+              setNotifications(function(prev){return prev.concat([n]);});
+              if(user&&user.id&&user.id.length>10){
+                createNotification({
+                  user_id:n.forCleaner||n.userId||user.id,
+                  type:n.type||"info",
+                  icon:n.icon||"🔔",
+                  title:n.title,
+                  body:n.body||null,
+                  for_role:n.forRole||null,
+                  nav_to:n.navTo||null,
+                  read:false,
+                }).catch(function(e){console.error("Notif save:",e.message);});
+              }
+            }}/>;
           case "Calendar": return <Cal props={props} cleaners={cleaners} setProps={setProps} user={user} setView={setView} myId={user.id} onSelectProp={function(id){setSelectedProp(id);setView("My Jobs");}} availability={availability} setAvailability={setAvailability}/>;
           case "Reports": return <Reports jobs={jobs} props={props} cleaners={cleaners}/>;
           case "Leaderboard": return <Leaderboard cleaners={cleaners} jobs={jobs} props={props}/>;
