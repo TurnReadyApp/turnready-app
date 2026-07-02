@@ -135,22 +135,66 @@ export async function getTeamCleaners(managerId) {
 export async function getProperties(managerId) {
   const { data, error } = await supabase
     .from('properties')
-    .select(`
-      *,
-      tasks(*),
-      rooms(*),
-      inventory(*)
-    `)
+    .select('*')
     .eq('manager_id', managerId)
     .order('created_at', { ascending: true })
   if (error) throw error
-  return data || []
+  // Map JSONB columns back to app field names
+  return (data || []).map(p => ({
+    ...p,
+    tasks: p.tasks_data || [],
+    rooms: p.rooms_data || [],
+    inventory: p.inventory_data || [],
+    schedule: p.schedule || [],
+    cleanerPhotos: p.cleaner_photos || [],
+    linenBagPhotos: p.linen_bag_photos || [],
+    cleanerNotes: p.cleaner_notes || '',
+    checkIn: p.check_in || '4:00 PM',
+    checkOut: p.check_out || '11:00 AM',
+    sameDay: p.same_day || false,
+    accessCode: p.access_code || '',
+    supplyInfo: p.supply_info || '',
+    alarmCode: p.alarm_code || '',
+    linenRate: p.linen_rate || 10,
+    linenBags: p.linen_bags || 0,
+    totalBeds: p.total_beds || 1,
+    assignedTo: p.assigned_to || null,
+  }))
 }
 
 export async function createProperty(property) {
+  // Map app field names to DB column names
+  const dbProp = {
+    manager_id: property.manager_id,
+    name: property.name,
+    address: property.address,
+    type: property.type || 'Airbnb',
+    pay: property.pay || 0,
+    bedrooms: property.bedrooms || 1,
+    bathrooms: property.bathrooms || 1,
+    photo: property.photo || null,
+    notes: property.notes || '',
+    check_in: property.check_in || property.checkIn || '4:00 PM',
+    check_out: property.check_out || property.checkOut || '11:00 AM',
+    same_day: property.same_day || property.sameDay || false,
+    access_code: property.access_code || property.accessCode || null,
+    supply_info: property.supply_info || property.supplyInfo || null,
+    alarm_code: property.alarm_code || property.alarmCode || null,
+    linen_rate: property.linen_rate || property.linenRate || 10,
+    total_beds: property.total_beds || property.totalBeds || property.bedrooms || 1,
+    tasks_data: property.tasks || [],
+    rooms_data: property.rooms || [],
+    inventory_data: property.inventory || [],
+    schedule: property.schedule || [],
+    cleaner_photos: property.cleanerPhotos || [],
+    linen_bag_photos: property.linenBagPhotos || [],
+    cleaner_notes: property.cleanerNotes || '',
+    linen_bags: property.linenBags || 0,
+    assigned_to: property.assignedTo || null,
+  }
   const { data, error } = await supabase
     .from('properties')
-    .insert(property)
+    .insert(dbProp)
     .select()
     .single()
   if (error) throw error
@@ -158,9 +202,46 @@ export async function createProperty(property) {
 }
 
 export async function updateProperty(id, updates) {
+  // Map app field names to DB column names
+  const dbUpdates = {}
+  if (updates.name !== undefined) dbUpdates.name = updates.name
+  if (updates.address !== undefined) dbUpdates.address = updates.address
+  if (updates.type !== undefined) dbUpdates.type = updates.type
+  if (updates.pay !== undefined) dbUpdates.pay = updates.pay
+  if (updates.bedrooms !== undefined) dbUpdates.bedrooms = updates.bedrooms
+  if (updates.bathrooms !== undefined) dbUpdates.bathrooms = updates.bathrooms
+  if (updates.photo !== undefined) dbUpdates.photo = updates.photo
+  if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+  if (updates.checkIn !== undefined) dbUpdates.check_in = updates.checkIn
+  if (updates.check_in !== undefined) dbUpdates.check_in = updates.check_in
+  if (updates.checkOut !== undefined) dbUpdates.check_out = updates.checkOut
+  if (updates.check_out !== undefined) dbUpdates.check_out = updates.check_out
+  if (updates.sameDay !== undefined) dbUpdates.same_day = updates.sameDay
+  if (updates.same_day !== undefined) dbUpdates.same_day = updates.same_day
+  if (updates.accessCode !== undefined) dbUpdates.access_code = updates.accessCode
+  if (updates.access_code !== undefined) dbUpdates.access_code = updates.access_code
+  if (updates.supplyInfo !== undefined) dbUpdates.supply_info = updates.supplyInfo
+  if (updates.supply_info !== undefined) dbUpdates.supply_info = updates.supply_info
+  if (updates.alarmCode !== undefined) dbUpdates.alarm_code = updates.alarmCode
+  if (updates.alarm_code !== undefined) dbUpdates.alarm_code = updates.alarm_code
+  if (updates.linenRate !== undefined) dbUpdates.linen_rate = updates.linenRate
+  if (updates.linen_rate !== undefined) dbUpdates.linen_rate = updates.linen_rate
+  if (updates.totalBeds !== undefined) dbUpdates.total_beds = updates.totalBeds
+  if (updates.total_beds !== undefined) dbUpdates.total_beds = updates.total_beds
+  if (updates.tasks !== undefined) dbUpdates.tasks_data = updates.tasks
+  if (updates.rooms !== undefined) dbUpdates.rooms_data = updates.rooms
+  if (updates.inventory !== undefined) dbUpdates.inventory_data = updates.inventory
+  if (updates.schedule !== undefined) dbUpdates.schedule = updates.schedule
+  if (updates.cleanerPhotos !== undefined) dbUpdates.cleaner_photos = updates.cleanerPhotos
+  if (updates.linenBagPhotos !== undefined) dbUpdates.linen_bag_photos = updates.linenBagPhotos
+  if (updates.cleanerNotes !== undefined) dbUpdates.cleaner_notes = updates.cleanerNotes
+  if (updates.linenBags !== undefined) dbUpdates.linen_bags = updates.linenBags
+  if (updates.assignedTo !== undefined) dbUpdates.assigned_to = updates.assignedTo
+  if (updates.guest_rating !== undefined) dbUpdates.guest_rating = updates.guest_rating
+
   const { data, error } = await supabase
     .from('properties')
-    .update(updates)
+    .update(dbUpdates)
     .eq('id', id)
     .select()
     .single()
