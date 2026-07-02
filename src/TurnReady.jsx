@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { supabase, signIn, signUp, signOut, getCurrentUser, getTeamCleaners, getProperties, getJobs, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications } from "./lib/supabase.js";
+import { supabase, signIn, signUp, signOut, getCurrentUser, getTeamCleaners, getProperties, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications } from "./lib/supabase.js";
 
 
 
@@ -2507,7 +2507,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
 }
 
 // ─── PROPERTIES ───────────────────────────────────────────────────────────────
-function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,addNotification}){
+function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,addNotification,user}){
   const [sel,setSel]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
   const [showTemplates,setShowTemplates]=useState(false);
@@ -2614,7 +2614,7 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
   async function addProp(){
     if(!form.name||!form.address||!form.pay)return;
     var newId="p"+Date.now();
-    setProps(ps=>[...ps,{
+    var localProp={
       id:newId,
       ...form,pay:Number(form.pay),bedrooms:Number(form.bedrooms)||1,bathrooms:Number(form.bathrooms)||1,
       photo:form.photo||"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",
@@ -2643,40 +2643,42 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
         {id:"r2",name:"Kitchen",icon:"🍳",guide:"Clear counters, aligned seating.",clip:"Clean kitchen counters.",refPhotos:["https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&q=80"],refVideo:null,video:null},
         {id:"r3",name:"Bathroom",icon:"🚿",guide:"Stage towels, clean mirror.",clip:"Bathroom towel staging.",refPhotos:["https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=400&q=80"],refVideo:null,video:null},
       ],
-    }]);
-    // Save to Supabase if user has real account
-    if(user&&user.id&&user.id!=="mgr1"){
-      var {createProperty} = await import("./lib/supabase.js").catch(function(){return {};});
-      if(createProperty){
-        try{
-          var dbProp=await createProperty({
-            manager_id:user.id,
-            name:form.name,
-            address:form.address,
-            type:form.type||"Airbnb",
-            pay:Number(form.pay),
-            bedrooms:Number(form.bedrooms)||1,
-            bathrooms:Number(form.bathrooms)||1,
-            photo:form.photo||null,
-            notes:"",
-            check_in:"4:00 PM",
-            check_out:"11:00 AM",
-            same_day:false,
-            linen_rate:10,
-            total_beds:Number(form.bedrooms)||1,
-          });
-          if(dbProp&&dbProp.id){
-            // Update the prop with real DB id
-            setProps(function(ps){return ps.map(function(p){
-              if(p.id===newId)return Object.assign({},p,{id:dbProp.id,dbId:dbProp.id});
-              return p;
-            });});
-          }
-        }catch(e){console.error("Failed to save property to Supabase:",e);}
-      }
-    }
+    };
+    // Add to local state immediately
+    setProps(function(ps){return ps.concat([localProp]);});
     setForm({name:"",address:"",type:"Airbnb",pay:"",bedrooms:"",bathrooms:"",description:"",photo:""});
     setShowAdd(false);
+    // Save to Supabase in background
+    if(user&&user.id&&user.id!=="mgr1"){
+      try{
+        var dbProp=await createProperty({
+          manager_id:user.id,
+          name:form.name.trim(),
+          address:form.address.trim(),
+          type:form.type||"Airbnb",
+          pay:Number(form.pay),
+          bedrooms:Number(form.bedrooms)||1,
+          bathrooms:Number(form.bathrooms)||1,
+          photo:form.photo||null,
+          notes:"",
+          check_in:"4:00 PM",
+          check_out:"11:00 AM",
+          same_day:false,
+          linen_rate:10,
+          total_beds:Number(form.bedrooms)||1,
+        });
+        if(dbProp&&dbProp.id){
+          // Replace temp ID with real Supabase ID
+          setProps(function(ps){return ps.map(function(p){
+            if(p.id===newId)return Object.assign({},p,{id:dbProp.id});
+            return p;
+          });});
+        }
+      }catch(e){
+        console.error("Supabase save failed:",e.message);
+        // Property stays in local state even if Supabase fails
+      }
+    }
   }
 
   function assign(propId,cleanerId,date,time,twoCleanerData){
@@ -9306,7 +9308,7 @@ export default function App() {
       if(user.role==="manager"){
         switch(view){
           case "Dashboard": return <Dashboard props={props} cleaners={cleaners} jobs={jobs} setView={setView} notifications={notifications} onSelectCleaner={(c)=>{setSelectedCleaner(c);setView("Team");}}/>;
-          case "Properties": return <Properties props={props} setProps={setProps} cleaners={cleaners} availability={availability} addNotification={function(n){setNotifications(function(prev){return prev.concat([n]);});}} initialSel={selectedProp} onClearSel={function(){setSelectedProp(null);}}/>;
+          case "Properties": return <Properties props={props} setProps={setProps} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){setNotifications(function(prev){return prev.concat([n]);});}} initialSel={selectedProp} onClearSel={function(){setSelectedProp(null);}}/>;
           case "Team": return <Cleaners cleaners={cleaners} setCleaners={setCleaners} jobs={jobs} pendingCleaners={pendingCleaners} setPendingCleaners={setPendingCleaners} allProps={props} setProps={setProps} user={user} availability={availability} initialSelected={selectedCleaner} onClearSelected={()=>setSelectedCleaner(null)}/>;
           case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={function(n){setNotifications(function(prev){return prev.concat([n]);});}}/>;
           case "Calendar": return <Cal props={props} cleaners={cleaners} setProps={setProps} user={user} setView={setView} onSelectProp={function(id){setSelectedProp(id);setView("Properties");}} availability={availability} setAvailability={setAvailability}/>;
