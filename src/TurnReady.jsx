@@ -1537,7 +1537,7 @@ function downloadMedia(url, filename){
   }
 }
 
-function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotification,templates}){
+function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotification,templates,user}){
   const [activeRoom,setActiveRoom]=useState(null);
   const [activeTab,setActiveTab]=useState("tasks");
   const [editingInvId,setEditingInvId]=useState(null);
@@ -1581,7 +1581,58 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
 
   return(
     <div>
-      <button className="btn ghost sm" onClick={onBack} style={{marginBottom:16}}>← Back</button>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <button className="btn ghost sm" onClick={onBack}>← Back</button>
+        <button onClick={function(){setShowDeleteConfirm(true);}}
+          style={{background:"transparent",border:"1px solid #EF4444",borderRadius:8,color:"#EF4444",fontSize:11,fontWeight:700,padding:"6px 14px",cursor:"pointer",fontFamily:"Arial Black,sans-serif",letterSpacing:.3}}>
+          🗑 DELETE PROPERTY
+        </button>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm&&(
+        <div className="modal-bg" onClick={function(){if(!deleting)setShowDeleteConfirm(false);}}>
+          <div className="modal" onClick={function(e){e.stopPropagation();}}>
+            <div style={{fontFamily:"Arial Black,sans-serif",fontSize:14,fontWeight:900,marginBottom:8,color:"#EF4444",letterSpacing:.5}}>DELETE PROPERTY?</div>
+            <div style={{fontSize:12,color:"#AAA",marginBottom:6,lineHeight:1.6}}>
+              You are about to permanently delete <span style={{color:"#FFF",fontWeight:700}}>{prop.name}</span>.
+            </div>
+            <div style={{fontSize:11,color:"#888",marginBottom:16,lineHeight:1.6,background:"rgba(239,68,68,.06)",border:"1px solid rgba(239,68,68,.2)",borderRadius:8,padding:"10px 12px"}}>
+              ⚠️ This will permanently remove the property, all its tasks, rooms, inventory, and schedule from your account. Any past job history will remain in your reports. This cannot be undone.
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={function(){setShowDeleteConfirm(false);}}
+                disabled={deleting}
+                style={{flex:1,background:"transparent",border:"1px solid #444",borderRadius:8,color:"#888",fontSize:12,fontWeight:700,padding:"10px",cursor:"pointer"}}>
+                CANCEL
+              </button>
+              <button onClick={async function(){
+                setDeleting(true);
+                try{
+                  // Remove from local state immediately
+                  setProps(function(ps){return ps.filter(function(p){return p.id!==prop.id;});});
+                  // Delete from Supabase if real property (UUID-style id)
+                  if(prop.id&&prop.id.length>20){
+                    await deleteProperty(prop.id);
+                  }
+                  setDeleting(false);
+                  setShowDeleteConfirm(false);
+                  onBack();
+                }catch(e){
+                  console.error("Delete failed:",e.message);
+                  setDeleting(false);
+                  setShowDeleteConfirm(false);
+                  onBack();
+                }
+              }}
+                disabled={deleting}
+                style={{flex:2,background:"#EF4444",border:"none",borderRadius:8,color:"#FFF",fontSize:12,fontWeight:900,padding:"10px",cursor:"pointer",fontFamily:"Arial Black,sans-serif",letterSpacing:.3}}>
+                {deleting?"DELETING...":"YES, DELETE PROPERTY"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{borderRadius:14,overflow:"hidden",marginBottom:20,position:"relative",height:200}}>
         {prop.photo&&<img src={prop.photo} alt={prop.name} onError={function(e){e.target.style.display="none";}} onClick={function(){setGalleryIdx(0);setShowGallery(true);}} style={{width:"100%",height:"100%",objectFit:"cover",position:"absolute",inset:0,cursor:"pointer"}}/>}
         <div onClick={function(){if(galleryImages.length>0){setGalleryIdx(0);setShowGallery(true);}}} style={{position:"absolute",inset:0,background:"linear-gradient(to top, rgba(0,0,0,.9) 0%, transparent 60%)",cursor:galleryImages.length>0?"pointer":"default"}}/>
@@ -2704,11 +2755,20 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
           bathrooms:Number(form.bathrooms)||1,
           photo:form.photo||null,
           notes:"",
-          check_in:"4:00 PM",
-          check_out:"11:00 AM",
-          same_day:false,
-          linen_rate:10,
-          total_beds:Number(form.bedrooms)||1,
+          checkIn:"4:00 PM",
+          checkOut:"11:00 AM",
+          sameDay:false,
+          linenRate:10,
+          totalBeds:Number(form.bedrooms)||1,
+          tasks:localProp.tasks||[],
+          rooms:localProp.rooms||[],
+          inventory:localProp.inventory||[],
+          schedule:[],
+          cleanerPhotos:[],
+          linenBagPhotos:[],
+          cleanerNotes:"",
+          linenBags:0,
+          assignedTo:null,
         });
         if(dbProp&&dbProp.id){
           // Replace temp ID with real Supabase ID
@@ -2768,7 +2828,7 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
 
   if(sel){
     var prop=props.find(p=>p.id===sel);
-    return <PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners}/>;
+    return <PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners} user={user}/>;
   }
 
   return(
@@ -8798,6 +8858,51 @@ export default function App() {
   useEffect(function(){
     try{localStorage.setItem("turnready_notifications",JSON.stringify(notifications.slice(0,50)));}catch(e){}
   },[notifications]);
+
+  // Auto-sync props to Supabase when they change (debounced)
+  const propsSyncTimer = useRef(null);
+  useEffect(function(){
+    if(!user||!user.id||user.id==="mgr1")return;
+    var isReal=false;
+    try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
+    if(!isReal)return;
+    // Debounce - wait 2 seconds after last change before saving
+    if(propsSyncTimer.current)clearTimeout(propsSyncTimer.current);
+    propsSyncTimer.current=setTimeout(function(){
+      props.forEach(function(p){
+        // Only sync props that have a UUID-style id (real Supabase props, not demo p1/p2/p3)
+        if(!p.id||p.id.length<20)return; // Skip demo props (they have short ids like "p1")
+        updateProperty(p.id,{
+          name:p.name,
+          address:p.address,
+          type:p.type,
+          pay:p.pay,
+          bedrooms:p.bedrooms,
+          bathrooms:p.bathrooms,
+          photo:p.photo,
+          notes:p.notes,
+          checkIn:p.checkIn||p.check_in,
+          checkOut:p.checkOut||p.check_out,
+          sameDay:p.sameDay||p.same_day,
+          accessCode:p.accessCode||p.access_code,
+          supplyInfo:p.supplyInfo||p.supply_info,
+          alarmCode:p.alarmCode||p.alarm_code,
+          linenRate:p.linenRate||p.linen_rate,
+          totalBeds:p.totalBeds||p.total_beds,
+          tasks:p.tasks,
+          rooms:p.rooms,
+          inventory:p.inventory,
+          schedule:p.schedule,
+          cleanerPhotos:p.cleanerPhotos,
+          linenBagPhotos:p.linenBagPhotos,
+          cleanerNotes:p.cleanerNotes,
+          linenBags:p.linenBags,
+          assignedTo:p.assignedTo,
+          guest_rating:p.guestRating,
+        }).catch(function(e){console.error("Failed to sync property",p.id,e.message);});
+      });
+    },2000);
+  },[props]);
 
   // Persist manager-specific data when they make changes
   useEffect(function(){
