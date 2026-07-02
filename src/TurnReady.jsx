@@ -1562,20 +1562,25 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
   const [newRoomName,setNewRoomName]=useState("");
   const [newRoomIcon,setNewRoomIcon]=useState("🛋️");
   const [note,setNote]=useState(prop.notes||"");
-  var done=prop.tasks.filter(t=>t.done).length;
-  var total=prop.tasks.length;
-  var propPct=pct(prop.tasks);
+  // Safely access arrays that might be undefined when loading from Supabase
+  var safeTasks=prop.tasks||[];
+  var safeRooms=prop.rooms||[];
+  var safeInventory=prop.inventory||[];
+  var safeSchedule=prop.schedule||[];
+  var done=safeTasks.filter(t=>t.done).length;
+  var total=safeTasks.length;
+  var propPct=pct(safeTasks);
   // Build gallery from all property images
   var galleryImages=[];
   if(prop.photo)galleryImages.push({url:prop.photo,label:"Cover Photo"});
-  (prop.rooms||[]).forEach(function(r){
+  safeRooms.forEach(function(r){
     (r.refPhotos||[]).forEach(function(ph){galleryImages.push({url:ph,label:r.name+" — Reference"});});
     if(r.refVideo)galleryImages.push({url:r.refVideo,label:r.name+" — Reference Video",isVideo:true});
     if(r.preVideo)galleryImages.push({url:r.preVideo,label:r.name+" — Pre-Clean (Arrival)",isVideo:true,isPre:true});
     if(r.video)galleryImages.push({url:r.video,label:r.name+" — After Clean",isAfter:true,isVideo:true});
   });
   (prop.cleanerPhotos||[]).forEach(function(ph){galleryImages.push({url:ph,label:"Cleaner Photo",isCleaner:true});});
-  var sections=[...new Set(prop.tasks.map(t=>t.section))];
+  var sections=[...new Set(safeTasks.map(t=>t.section))];
 
   function saveNote(){setProps(ps=>ps.map(x=>x.id===prop.id?{...x,notes:note}:x));}
 
@@ -1685,8 +1690,8 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
           <div style={{fontWeight:600,fontSize:13}}>Job Schedule</div>
           <button className="btn sm" onClick={onAssign}>+ Assign Cleaner</button>
         </div>
-        {(!prop.schedule||prop.schedule.length===0)&&<div style={{fontSize:12,color:"#888"}}>No jobs scheduled yet. Tap Assign Cleaner to add one.</div>}
-        {(prop.schedule||[]).map(slot=>{
+        {(!prop.schedule||safeSchedule.length===0)&&<div style={{fontSize:12,color:"#888"}}>No jobs scheduled yet. Tap Assign Cleaner to add one.</div>}
+        {safeSchedule.map(slot=>{
           var sc=slot.cleanerId?(cleaners||[]).find(c=>c.id===slot.cleanerId):null;
           var sc2=slot.cleanerId2?(cleaners||[]).find(function(c){return c.id===slot.cleanerId2;}):null;
           var hoursLeft=slot.assignedAt?Math.max(0,8-((Date.now()-new Date(slot.assignedAt).getTime())/3600000)):0;
@@ -1774,7 +1779,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                       // Update all tasks in this section live
                       setProps(function(ps){return ps.map(function(pp){
                         if(pp.id!==prop.id)return pp;
-                        return Object.assign({},pp,{tasks:pp.tasks.map(function(tk){
+                        return Object.assign({},pp,{tasks:(pp.tasks||[]).map(function(tk){
                           return tk.section===oldName?Object.assign({},tk,{section:newName}):tk;
                         })});
                       });});
@@ -1790,7 +1795,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                 <div className="section-header" onClick={function(){setEditSecName(sec);}}
                   style={{cursor:"text"}}>— {sec} <span style={{fontSize:9,color:"#444",fontWeight:400}}>✏️</span></div>
               )}
-              {prop.tasks.filter(function(t){return t.section===sec;}).map(function(t){return(
+              {safeTasks.filter(function(t){return t.section===sec;}).map(function(t){return(
                 <div key={t.id}
                   draggable={true}
                   onDragStart={function(e){setDragTaskId(t.id);e.dataTransfer.effectAllowed="move";}}
@@ -1821,7 +1826,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                   <div style={{cursor:"grab",color:"#555",fontSize:16,flexShrink:0,
                     userSelect:"none",padding:"0 2px",touchAction:"none"}}>⠿</div>
                   <div onClick={function(){setProps(function(ps){return ps.map(function(pp){
-                    return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:pp.tasks.map(function(tk){
+                    return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).map(function(tk){
                       return tk.id!==t.id?tk:Object.assign({},tk,{done:!tk.done});
                     })});
                   });})}}
@@ -1831,7 +1836,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                   </div>
                   <input value={t.label}
                     onChange={function(e){setProps(function(ps){return ps.map(function(pp){
-                      return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:pp.tasks.map(function(tk){
+                      return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).map(function(tk){
                         return tk.id!==t.id?tk:Object.assign({},tk,{label:e.target.value});
                       })});
                     });});}}
@@ -1839,7 +1844,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                       color:t.done?C.muted:C.white,textDecoration:t.done?"line-through":"none",
                       fontFamily:"Inter,sans-serif",padding:0}}/>
                   <button onClick={function(){setProps(function(ps){return ps.map(function(pp){
-                    return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:pp.tasks.filter(function(tk){return tk.id!==t.id;})});
+                    return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).filter(function(tk){return tk.id!==t.id;})});
                   });});}}
                     style={{background:"none",border:"none",color:"#444",fontSize:16,cursor:"pointer",flexShrink:0,padding:"0 4px"}}>×</button>
                 </div>
@@ -1855,7 +1860,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                       onKeyDown={function(e){
                         if(e.key==="Enter"&&secLabel.trim()){
                           var newTask={id:"t"+Date.now(),section:sec,label:secLabel.trim(),done:false};
-                          setProps(function(ps){return ps.map(function(pp){return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:pp.tasks.concat([newTask])});});});
+                          setProps(function(ps){return ps.map(function(pp){return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).concat([newTask])});});});
                           setNewTaskLabels(function(prev){var u=Object.assign({},prev);delete u[sec];delete u["_show_"+sec];return u;});
                         }
                         if(e.key==="Escape"){setNewTaskLabels(function(prev){var u=Object.assign({},prev);delete u[sec];delete u["_show_"+sec];return u;});}
@@ -1865,7 +1870,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     <button onClick={function(){
                       if(!secLabel.trim())return;
                       var newTask={id:"t"+Date.now(),section:sec,label:secLabel.trim(),done:false};
-                      setProps(function(ps){return ps.map(function(pp){return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:pp.tasks.concat([newTask])});});});
+                      setProps(function(ps){return ps.map(function(pp){return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).concat([newTask])});});});
                       setNewTaskLabels(function(prev){var u=Object.assign({},prev);delete u[sec];delete u["_show_"+sec];return u;});
                     }} style={{background:"#CC0000",border:"none",borderRadius:6,color:"#FFF",fontSize:11,fontWeight:700,padding:"5px 10px",cursor:"pointer"}}>Add</button>
                     <button onClick={function(){setNewTaskLabels(function(prev){var u=Object.assign({},prev);delete u[sec];delete u["_show_"+sec];return u;});}}
@@ -1886,7 +1891,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                 onKeyDown={function(e){
                   if(e.key==="Enter"&&newSecName.trim()){
                     var newTask={id:"t"+Date.now(),section:newSecName.trim(),label:"New task",done:false};
-                    setProps(function(ps){return ps.map(function(pp){return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:pp.tasks.concat([newTask])});});});
+                    setProps(function(ps){return ps.map(function(pp){return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).concat([newTask])});});});
                     setNewSecName("");setShowNewSec(false);
                   }
                   if(e.key==="Escape"){setNewSecName("");setShowNewSec(false);}
@@ -1896,7 +1901,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
               <button onClick={function(){
                 if(!newSecName.trim())return;
                 var newTask={id:"t"+Date.now(),section:newSecName.trim(),label:"New task",done:false};
-                setProps(function(ps){return ps.map(function(pp){return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:pp.tasks.concat([newTask])});});});
+                setProps(function(ps){return ps.map(function(pp){return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).concat([newTask])});});});
                 setNewSecName("");setShowNewSec(false);
               }} style={{background:"#CC0000",border:"none",borderRadius:6,color:"#FFF",fontSize:11,fontWeight:700,padding:"6px 12px",cursor:"pointer"}}>Add</button>
               <button onClick={function(){setNewSecName("");setShowNewSec(false);}} style={{background:"transparent",border:"1px solid #444",borderRadius:6,color:"#888",fontSize:11,padding:"6px 10px",cursor:"pointer"}}>✕</button>
@@ -1911,7 +1916,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
 
       {activeTab==="rooms"&&(
         <div>
-          {(prop.rooms||[]).map(function(r){
+          {safeRooms.map(function(r){
             var isEditing=editingRoomId===r.id;
             return(
               <div key={r.id} className="card" style={{marginBottom:14}}>
@@ -1930,22 +1935,22 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                       <div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:.3,marginBottom:6}}>Icon</div>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                         {["🛋️","🛏️","🚿","🍳","🚪","🏠","🪴","🛁","🪟","🗄️","🧺","🏋️","🎮","📺","🪑"].map(function(em){return(
-                          <button key={em} onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{icon:em});})});});});}}
+                          <button key={em} onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{icon:em});})});});});}}
                             style={{width:36,height:36,borderRadius:8,border:"2px solid "+(r.icon===em?"#CC0000":"#333"),background:r.icon===em?"rgba(204,0,0,.15)":"transparent",fontSize:18,cursor:"pointer"}}>{em}</button>
                         );})}
                       </div>
                     </div>
                     <div style={{marginBottom:12}}>
                       <div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:.3,marginBottom:6}}>Room Name</div>
-                      <input defaultValue={r.name} onBlur={function(e){var v=e.target.value;setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{name:v});})});});});}}
+                      <input defaultValue={r.name} onBlur={function(e){var v=e.target.value;setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{name:v});})});});});}}
                         style={{width:"100%",background:"#2A2A2A",border:"1px solid #444",borderRadius:6,color:"#FFF",fontSize:14,fontWeight:600,padding:"8px 10px",outline:"none",boxSizing:"border-box"}}/>
                     </div>
                     <div style={{marginBottom:12}}>
                       <div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:.3,marginBottom:6}}>Staging Guide</div>
-                      <textarea defaultValue={r.guide||""} onBlur={function(e){var v=e.target.value;setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{guide:v});})});});});}}
+                      <textarea defaultValue={r.guide||""} onBlur={function(e){var v=e.target.value;setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{guide:v});})});});});}}
                         rows={3} placeholder="How should this room be staged?" style={{width:"100%",background:"#2A2A2A",border:"1px solid #444",borderRadius:6,color:"#FFF",fontSize:12,padding:"8px 10px",outline:"none",resize:"vertical",fontFamily:"Inter,sans-serif",lineHeight:1.6,boxSizing:"border-box"}}/>
                     </div>
-                    <button onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.filter(function(rm){return rm.id!==r.id;})});});});setEditingRoomId(null);}}
+                    <button onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).filter(function(rm){return rm.id!==r.id;})});});});setEditingRoomId(null);}}
                       style={{width:"100%",background:"transparent",border:"1px solid #EF4444",borderRadius:6,color:"#EF4444",fontSize:11,fontWeight:700,padding:"8px",cursor:"pointer"}}>🗑 REMOVE THIS ROOM</button>
                   </div>
                 )}
@@ -1961,7 +1966,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     {(r.refPhotos||[]).map(function(ph,i){return(
                       <div key={i} style={{position:"relative",flexShrink:0}}>
                         <img src={ph} alt={"ref "+(i+1)} onClick={function(){setGalleryIdx(galleryImages.findIndex(function(g){return g.url===ph;}));setShowGallery(true);}} style={{width:80,height:80,borderRadius:8,objectFit:"cover",display:"block",cursor:"pointer"}}/>
-                        <button onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){if(rm.id!==r.id)return rm;var ph2=(rm.refPhotos||[]).filter(function(_,j){return j!==i;});return Object.assign({},rm,{refPhotos:ph2});})});});});}}
+                        <button onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;var ph2=(rm.refPhotos||[]).filter(function(_,j){return j!==i;});return Object.assign({},rm,{refPhotos:ph2});})});});});}}
                           style={{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:"50%",background:"#EF4444",border:"none",color:"#FFF",fontSize:10,cursor:"pointer",fontWeight:900}}>x</button>
                       </div>
                     );})}
@@ -1983,7 +1988,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                             <span style={{fontSize:20,color:"#FFF"}}>▶</span>
                           </div>
                         </div>
-                        <button onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:null});})});});});}}
+                        <button onClick={function(){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:null});})});});});}}
                           style={{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:"50%",background:"#EF4444",border:"none",color:"#FFF",fontSize:10,cursor:"pointer",fontWeight:900}}>x</button>
                       </div>
                     )}
@@ -1992,25 +1997,25 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
                       📷 Camera
                       <input type="file" accept="image/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([ev.target.result])});})});});});};reader.readAsDataURL(file);});}}/>
+                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([ev.target.result])});})});});});};reader.readAsDataURL(file);});}}/>
                     </label>
                     <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
                       📸 Gallery
                       <input type="file" accept="image/*" multiple style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([ev.target.result])});})});});});};reader.readAsDataURL(file);});}}/>
+                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([ev.target.result])});})});});});};reader.readAsDataURL(file);});}}/>
                     </label>
                     {!r.refVideo&&(
                       <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
                         🎬 Record
                         <input type="file" accept="video/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                          onChange={function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev.target.result});})});});});};reader.readAsDataURL(file);}}/>
+                          onChange={function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev.target.result});})});});});};reader.readAsDataURL(file);}}/>
                       </label>
                     )}
                     {!r.refVideo&&(
                       <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
                         📁 Video
                         <input type="file" accept="video/*" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                          onChange={function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:p.rooms.map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev.target.result});})});});});};reader.readAsDataURL(file);}}/>
+                          onChange={function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev.target.result});})});});});};reader.readAsDataURL(file);}}/>
                       </label>
                     )}
                   {/* Photo Comparison */}
@@ -2129,7 +2134,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
       {activeTab==="inventory"&&(
         <div className="card">
           <div style={{fontWeight:600,fontSize:13,marginBottom:14}}>Inventory / Supplies</div>
-          {(prop.inventory||[]).map(function(inv){
+          {safeInventory.map(function(inv){
             // Show cleaner's reported status if available, else fall back to stock levels
             var cleanerSt=inv.cleanerStatus;
             var empty=cleanerSt?cleanerSt==="low":inv.inStock===0;
@@ -2146,7 +2151,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                       if(editingInvName.trim()){
                         setProps(function(ps){return ps.map(function(p){
                           if(p.id!==prop.id)return p;
-                          return Object.assign({},p,{inventory:p.inventory.map(function(i){
+                          return Object.assign({},p,{inventory:(p.inventory||[]).map(function(i){
                             return i.id!==inv.id?i:Object.assign({},i,{item:editingInvName.trim()});
                           })});
                         });});
@@ -2167,7 +2172,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                 <button onClick={function(){
                   setProps(function(ps){return ps.map(function(p){
                     if(p.id!==prop.id)return p;
-                    return Object.assign({},p,{inventory:p.inventory.filter(function(i){return i.id!==inv.id;})});
+                    return Object.assign({},p,{inventory:(p.inventory||[]).filter(function(i){return i.id!==inv.id;})});
                   });});
                 }} style={{background:"transparent",border:"1px solid #EF4444",borderRadius:6,color:"#EF4444",fontSize:10,padding:"3px 7px",cursor:"pointer",flexShrink:0}}>Del</button>
               </div>
@@ -2891,7 +2896,7 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
                 </div>
                 <div className="prog-bar"><div className="prog-fill" style={{width:(progress)+"%"}}/></div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:C.muted,marginTop:5}}>
-                  <span>{pp.tasks.filter(t=>t.done).length}/{pp.tasks.length} tasks</span>
+                  <span>{(pp.tasks||[]).filter(t=>t.done).length}/{(pp.tasks||[]).length} tasks</span>
                   {cl&&<span>👤 {cl.name}</span>}
                 </div>
               </div>
@@ -3880,7 +3885,7 @@ function Cal({props,cleaners,myId,onSelectProp,user,setView,setProps,availabilit
                         <button onClick={function(){
                           setProps(function(ps){return ps.map(function(pp){
                             if(pp.id!==item.prop.id)return pp;
-                            return Object.assign({},pp,{schedule:pp.schedule.map(function(s){
+                            return Object.assign({},pp,{schedule:(pp.schedule||[]).map(function(s){
                               return s.id!==item.slot.id?s:Object.assign({},s,{status:"accepted"});
                             })});
                           });});
@@ -3888,7 +3893,7 @@ function Cal({props,cleaners,myId,onSelectProp,user,setView,setProps,availabilit
                         <button onClick={function(){
                           setProps(function(ps){return ps.map(function(pp){
                             if(pp.id!==item.prop.id)return pp;
-                            return Object.assign({},pp,{schedule:pp.schedule.map(function(s){
+                            return Object.assign({},pp,{schedule:(pp.schedule||[]).map(function(s){
                               return s.id!==item.slot.id?s:Object.assign({},s,{status:"declined"});
                             })});
                           });});
@@ -4067,7 +4072,7 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
                   // Remove from schedule
                   setProps(function(ps){return ps.map(function(pp){
                     if(pp.id!==item.prop.id)return pp;
-                    return Object.assign({},pp,{schedule:pp.schedule.filter(function(s){return s.id!==item.removal.slotId;})});
+                    return Object.assign({},pp,{schedule:(pp.schedule||[]).filter(function(s){return s.id!==item.removal.slotId;})});
                   });});
                   // Remove from pendingRemovals
                   setPendingRemovals(function(prev){return prev.filter(function(r){return r.id!==item.removal.id;});});
@@ -4164,7 +4169,7 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
                     // Cancel this slot
                     setProps(function(ps){return ps.map(function(pp){
                       if(pp.id!==item.prop.id)return pp;
-                      return Object.assign({},pp,{schedule:pp.schedule.filter(function(s){return s.id!==item.slot.id;})});
+                      return Object.assign({},pp,{schedule:(pp.schedule||[]).filter(function(s){return s.id!==item.slot.id;})});
                     });});
                   }} style={{flex:1,background:"transparent",border:"1px solid #555",borderRadius:6,padding:"7px",color:"#888",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Arial Black,sans-serif"}}>CANCEL</button>
                   <button onClick={function(e){
@@ -4172,7 +4177,7 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
                     var slotId=item.slot.id;
                     setProps(function(ps){return ps.map(function(pp){
                       if(pp.id!==item.prop.id)return pp;
-                      return Object.assign({},pp,{schedule:pp.schedule.map(function(s){
+                      return Object.assign({},pp,{schedule:(pp.schedule||[]).map(function(s){
                         return s.id!==slotId?s:Object.assign({},s,{assignedAt:new Date().toISOString()});
                       })});
                     });});
@@ -4553,7 +4558,7 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
                 if(!reassignCid)return;
                 setProps(function(ps){return ps.map(function(pp){
                   if(pp.id!==reassignSlot.prop.id)return pp;
-                  return Object.assign({},pp,{schedule:pp.schedule.map(function(s){
+                  return Object.assign({},pp,{schedule:(pp.schedule||[]).map(function(s){
                     return s.id!==reassignSlot.slot.id?s:Object.assign({},s,{
                       cleanerId:reassignCid,
                       status:"pending_acceptance",
@@ -5167,17 +5172,17 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
   function toggleTask(propId,taskId){
     setProps(function(ps){return ps.map(function(p){
       if(p.id!==propId)return p;
-      return Object.assign({},p,{tasks:p.tasks.map(function(t){return t.id===taskId?Object.assign({},t,{done:!t.done}):t;})});
+      return Object.assign({},p,{tasks:(p.tasks||[]).map(function(t){return t.id===taskId?Object.assign({},t,{done:!t.done}):t;})});
     });});
   }
 
   function updateInv(propId,invId,status){
     setProps(function(ps){return ps.map(function(p){
       if(p.id!==propId)return p;
-      var updated=Object.assign({},p,{inventory:p.inventory.map(function(i){return i.id===invId?Object.assign({},i,{cleanerStatus:status}):i;})});
+      var updated=Object.assign({},p,{inventory:(p.inventory||[]).map(function(i){return i.id===invId?Object.assign({},i,{cleanerStatus:status}):i;})});
       // Fire notification if item marked low
       if(status==="low"&&addNotification){
-        var inv=p.inventory.find(function(i){return i.id===invId;});
+        var inv=(p.inventory||[]).find(function(i){return i.id===invId;});
         if(inv){
           // Count how many props have this item low
           var lowCount=ps.filter(function(pp){return (pp.inventory||[]).some(function(ii){return ii.item===inv.item&&(ii.cleanerStatus==="low"||ii.inStock===0);});}).length+1;
@@ -5196,7 +5201,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
     reader.onload=function(ev){
       setProps(function(ps){return ps.map(function(p){
         if(p.id!==propId)return p;
-        return Object.assign({},p,{rooms:p.rooms.map(function(r){
+        return Object.assign({},p,{rooms:(p.rooms||[]).map(function(r){
           if(r.id!==roomId)return r;
           return Object.assign({},r,{video:ev.target.result,videoName:file.name});
         })});
@@ -5659,7 +5664,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                       <video src={room.preVideo} controls style={{width:"100%",borderRadius:8,maxHeight:180}}/>
                       <button onClick={function(){setProps(function(ps){return ps.map(function(pp){
                         if(pp.id!==prop.id)return pp;
-                        return Object.assign({},pp,{rooms:pp.rooms.map(function(rm){return rm.id!==room.id?rm:Object.assign({},rm,{preVideo:null});})});
+                        return Object.assign({},pp,{rooms:(pp.rooms||[]).map(function(rm){return rm.id!==room.id?rm:Object.assign({},rm,{preVideo:null});})});
                       });});}}
                         style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.7)",border:"none",borderRadius:6,color:"#FFF",fontSize:11,padding:"4px 8px",cursor:"pointer"}}>✕ Remove</button>
                     </div>
@@ -5676,7 +5681,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                           var reader=new FileReader();
                           reader.onload=function(ev){setProps(function(ps){return ps.map(function(pp){
                             if(pp.id!==prop.id)return pp;
-                            return Object.assign({},pp,{rooms:pp.rooms.map(function(rm){return rm.id!==room.id?rm:Object.assign({},rm,{preVideo:ev.target.result});})});
+                            return Object.assign({},pp,{rooms:(pp.rooms||[]).map(function(rm){return rm.id!==room.id?rm:Object.assign({},rm,{preVideo:ev.target.result});})});
                           });});};
                           reader.readAsDataURL(file);
                         }}/>
@@ -5692,7 +5697,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                         <div style={{fontSize:11,color:"#22C55E",fontWeight:600}}>✓ {room.videoName||"Video uploaded"}</div>
                         <button onClick={function(){setProps(function(ps){return ps.map(function(pp){
                           if(pp.id!==prop.id)return pp;
-                          return Object.assign({},pp,{rooms:pp.rooms.map(function(rm){return rm.id!==room.id?rm:Object.assign({},rm,{video:null,videoName:null});})});
+                          return Object.assign({},pp,{rooms:(pp.rooms||[]).map(function(rm){return rm.id!==room.id?rm:Object.assign({},rm,{video:null,videoName:null});})});
                         });});}}
                           style={{background:"transparent",border:"1px solid #EF4444",borderRadius:6,color:"#EF4444",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>✕ Remove</button>
                       </div>
@@ -5715,7 +5720,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                         uploadRoomVideo(prop.id,room.id,file);
                         setProps(function(ps){return ps.map(function(pp){
                           if(pp.id!==prop.id)return pp;
-                          return Object.assign({},pp,{rooms:pp.rooms.map(function(rm){
+                          return Object.assign({},pp,{rooms:(pp.rooms||[]).map(function(rm){
                             return rm.id!==room.id?rm:Object.assign({},rm,{videoName:file.name});
                           })});
                         });});
@@ -5735,7 +5740,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                         uploadRoomVideo(prop.id,room.id,file);
                         setProps(function(ps){return ps.map(function(pp){
                           if(pp.id!==prop.id)return pp;
-                          return Object.assign({},pp,{rooms:pp.rooms.map(function(rm){
+                          return Object.assign({},pp,{rooms:(pp.rooms||[]).map(function(rm){
                             return rm.id!==room.id?rm:Object.assign({},rm,{videoName:file.name});
                           })});
                         });});
@@ -6386,7 +6391,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                         e.stopPropagation();
                         setProps(function(ps){return ps.map(function(pp){
                           if(pp.id!==prop.id)return pp;
-                          return Object.assign({},pp,{schedule:pp.schedule.map(function(s){
+                          return Object.assign({},pp,{schedule:(pp.schedule||[]).map(function(s){
                             return s.id!==pendingSlot.id?s:Object.assign({},s,{status:"accepted"});
                           })});
                         });});
@@ -6396,7 +6401,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                         e.stopPropagation();
                         setProps(function(ps){return ps.map(function(pp){
                           if(pp.id!==prop.id)return pp;
-                          return Object.assign({},pp,{schedule:pp.schedule.map(function(s){
+                          return Object.assign({},pp,{schedule:(pp.schedule||[]).map(function(s){
                             return s.id!==pendingSlot.id?s:Object.assign({},s,{status:"declined"});
                           })});
                         });});
@@ -8979,7 +8984,7 @@ export default function App() {
                   // Auto-reassign to backup
                   setProps(function(ps){return ps.map(function(pp){
                     if(pp.id!==p.id)return pp;
-                    return Object.assign({},pp,{schedule:pp.schedule.map(function(ss){
+                    return Object.assign({},pp,{schedule:(pp.schedule||[]).map(function(ss){
                       if(ss.id!==slot.id)return ss;
                       return Object.assign({},ss,{
                         cleanerId:backupCl.id,
