@@ -47,6 +47,23 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+
+// ─── IMAGE COMPRESSION HELPER ─────────────────────────────────────────────────
+function compressImage(dataUrl, maxWidth, maxHeight, quality, callback) {
+  var img = new window.Image();
+  img.onload = function() {
+    var canvas = document.createElement('canvas');
+    var w = img.width, h = img.height;
+    if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+    if (h > maxHeight) { w = Math.round(w * maxHeight / h); h = maxHeight; }
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    callback(canvas.toDataURL('image/jpeg', quality || 0.7));
+  };
+  img.src = dataUrl;
+}
+
 // ─── BRAND COLORS ────────────────────────────────────────────────────────────
 const DARK_THEME = {
   bg:"#0D0D0D",surface:"#141414",card:"#1A1A1A",border:"#2A2A2A",
@@ -2042,12 +2059,12 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
                       📷 Camera
                       <input type="file" accept="image/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([ev.target.result])});})});});});};reader.readAsDataURL(file);});}}/>
+                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){compressImage(ev.target.result,1200,1200,0.75,function(compressed){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([compressed])});})});});});});};reader.readAsDataURL(file);});}}/>
                     </label>
                     <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
                       📸 Gallery
                       <input type="file" accept="image/*" multiple style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([ev.target.result])});})});});});};reader.readAsDataURL(file);});}}/>
+                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){compressImage(ev.target.result,1200,1200,0.75,function(compressed){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([compressed])});})});});});});};reader.readAsDataURL(file);});}}/>
                     </label>
                     {!r.refVideo&&(
                       <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
@@ -2400,12 +2417,12 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                 <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #444",borderRadius:6,padding:"7px",cursor:"pointer",fontSize:10,color:"#888",fontWeight:700}}>
                   📷 Take Photo
                   <input type="file" accept="image/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                    onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:ev.target.result});});});};r.readAsDataURL(f);}}/>
+                    onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){compressImage(ev.target.result,1200,800,0.8,function(compressed){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});});};r.readAsDataURL(f);}}/>
                 </label>
                 <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #444",borderRadius:6,padding:"7px",cursor:"pointer",fontSize:10,color:"#888",fontWeight:700}}>
                   📁 Upload Photo
                   <input type="file" accept="image/*" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                    onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:ev.target.result});});});};r.readAsDataURL(f);}}/>
+                    onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){compressImage(ev.target.result,1200,800,0.8,function(compressed){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});});};r.readAsDataURL(f);}}/>
                 </label>
               </div>
             )}
@@ -5924,12 +5941,12 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                       <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #3B82F6",borderRadius:6,padding:"6px",cursor:started?"pointer":"not-allowed",fontSize:10,color:"#3B82F6",opacity:started?1:.5}}>
                         📸 Photo
                         <input type="file" accept="image/*" capture="environment" disabled={!started} style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                          onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{linenBagPhotos:(p.linenBagPhotos||[]).concat([ev.target.result])});});});};r.readAsDataURL(f);}}/>
+                          onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){compressImage(ev.target.result,1200,1200,0.75,function(compressed){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{linenBagPhotos:(p.linenBagPhotos||[]).concat([compressed])});});});});};r.readAsDataURL(f);}}/>
                       </label>
                       <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #3B82F6",borderRadius:6,padding:"6px",cursor:started?"pointer":"not-allowed",fontSize:10,color:"#3B82F6",opacity:started?1:.5}}>
                         🎬 Video
                         <input type="file" accept="video/*" capture="environment" disabled={!started} style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                          onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{linenBagPhotos:(p.linenBagPhotos||[]).concat([ev.target.result])});});});};r.readAsDataURL(f);}}/>
+                          onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){compressImage(ev.target.result,1200,1200,0.75,function(compressed){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{linenBagPhotos:(p.linenBagPhotos||[]).concat([compressed])});});});});};r.readAsDataURL(f);}}/>
                       </label>
                     </div>
                   </div>
@@ -8922,6 +8939,14 @@ export default function App() {
       props.forEach(function(p){
         // Only sync props that have a UUID-style id (real Supabase props, not demo p1/p2/p3)
         if(!p.id||p.id.length<20)return; // Skip demo props (they have short ids like "p1")
+        // Strip large base64 videos from rooms before syncing (keep photos only, compress separately)
+        var roomsForSync=(p.rooms||[]).map(function(r){
+          return Object.assign({},r,{
+            // Keep ref photos (compressed) but strip large videos to avoid payload limits
+            video: r.video&&r.video.length<500000?r.video:null, // Max ~375KB for video thumbnails
+            preVideo: r.preVideo&&r.preVideo.length<500000?r.preVideo:null,
+          });
+        });
         updateProperty(p.id,{
           name:p.name,
           address:p.address,
@@ -8940,7 +8965,7 @@ export default function App() {
           linenRate:p.linenRate||p.linen_rate,
           totalBeds:p.totalBeds||p.total_beds,
           tasks:p.tasks,
-          rooms:p.rooms,
+          rooms:roomsForSync,
           inventory:p.inventory,
           schedule:p.schedule,
           cleanerPhotos:p.cleanerPhotos,
@@ -8949,7 +8974,9 @@ export default function App() {
           linenBags:p.linenBags,
           assignedTo:p.assignedTo,
           guest_rating:p.guestRating,
-        }).catch(function(e){console.error("Failed to sync property",p.id,e.message);});
+        }).catch(function(e){
+          console.error("❌ Supabase sync failed for property",p.id,"Error:",e.message,"Code:",e.code);
+        });
       });
     },2000);
   },[props]);
