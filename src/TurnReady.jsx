@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { supabase, signIn, signUp, signOut, getCurrentUser, getTeamCleaners, getProperties, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications } from "./lib/supabase.js";
+import { supabase, signIn, signUp, signOut, getCurrentUser, updateUserProfile, getTeamCleaners, getProperties, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications } from "./lib/supabase.js";
 
 
 
@@ -911,7 +911,18 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
         localStorage.setItem("turnready_is_real_user","true");
       }catch(e){}
       setLoading(false);
-      onLogin(profile);
+      // Map DB field names to app field names
+      var mappedProfile=Object.assign({},profile,{
+        stripeStatus:profile.stripe_status||"pending",
+        stripeAccount:profile.stripe_account_id||null,
+        stripeBusinessStatus:profile.stripe_business_status||"not_connected",
+        stripeBusinessAccount:profile.stripe_business_account||null,
+        businessName:profile.business_name||null,
+        totalEarned:profile.total_earned||0,
+        jobsCompleted:profile.jobs_completed||0,
+        joinedAt:profile.joined_at||profile.created_at,
+      });
+      onLogin(mappedProfile);
     }catch(e){
       // Fall back to demo accounts if Supabase fails
       if(email===MANAGER_ACCOUNT.email&&pwd===MANAGER_ACCOUNT.password){
@@ -1089,7 +1100,14 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
                   await signIn({email:email.trim().toLowerCase(),password:pwd});
                   var profile=await getCurrentUser();
                   setLoading(false);
-                  onLogin(profile,true,profile);
+                  var mp=profile?Object.assign({},profile,{
+                    stripeStatus:profile.stripe_status||"pending",
+                    stripeAccount:profile.stripe_account_id||null,
+                    totalEarned:profile.total_earned||0,
+                    jobsCompleted:profile.jobs_completed||0,
+                    joinedAt:profile.joined_at||new Date().toISOString(),
+                  }):profile;
+                  onLogin(mp,true,mp);
                 } else {
                   setLoading(false);setSignupDone(true);
                 }
@@ -4053,6 +4071,16 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
     setRatingJob(job);
     setManagerRating(0);
     setManagerComment("");
+    // Persist to Supabase if real job
+    if(job.dbId||( job.id&&job.id.length>10&&job.id[0]!=="j")){
+      var realJobId=job.dbId||job.id;
+      updateJob(realJobId,{status:"approved",paid_at:new Date().toISOString()}).catch(function(e){console.error("Approve save failed:",e.message);});
+    }
+    // Also update cleaner stats in Supabase
+    if(job.cleanerId&&job.cleanerId.length>20){
+      var cl=cleaners.find(function(c){return c.id===job.cleanerId;})||{};
+      updateUserProfile(job.cleanerId,{total_earned:(cl.totalEarned||0)+cleaner1Pay,jobs_completed:(cl.jobsCompleted||0)+1}).catch(function(e){console.error("Cleaner stats save:",e.message);});
+    }
   }
 
   function submitRating(){
@@ -4073,9 +4101,15 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
   }
 
   function reject(jobId,reason){
+    var job=jobs.find(function(j){return j.id===jobId;});
     setJobs(function(js){return js.map(function(j){
       return j.id===jobId?Object.assign({},j,{status:"needs_resubmit",rejectedAt:new Date().toISOString(),rejectReason:reason}):j;
     });});
+    // Persist to Supabase if real job
+    if(job&&(job.dbId||(job.id&&job.id.length>10&&job.id[0]!=="j"))){
+      var realJobId=job.dbId||job.id;
+      updateJob(realJobId,{status:"needs_resubmit",rejection_reason:reason}).catch(function(e){console.error("Reject save failed:",e.message);});
+    }
     // Notify the cleaner
     var job=jobs.find(function(j){return j.id===jobId;});
     if(job){
@@ -5314,8 +5348,40 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
       setJobs(function(js){return js.map(function(j){
         return j.id!==existingRejected.id?j:Object.assign({},newJob,{id:existingRejected.id});
       });});
+      // Update in Supabase if real job
+      if(existingRejected.id&&existingRejected.id.length>10&&existingRejected.id[0]!=="j"){
+        updateJob(existingRejected.id,{status:"pending_approval",tasks:newJob.tasks,inventory:newJob.inventory,completed_at:newJob.completedAt,cleaner_notes:newJob.cleanerNotes,duration_seconds:newJob.duration}).catch(function(e){console.error("Job update failed:",e.message);});
+      }
     } else {
       setJobs(function(js){return js.concat([newJob]);});
+      // Save to Supabase
+      if(user&&user.id&&user.id.length>10){
+        var dbJob={
+          property_id:prop.id&&prop.id.length>20?prop.id:null,
+          property_name:prop.name,
+          cleaner_id:user.id,
+          status:"pending_approval",
+          pay:newJob.pay||0,
+          date:new Date().toISOString().split("T")[0],
+          tasks:newJob.tasks,
+          inventory:newJob.inventory,
+          uploads:newJob.uploads||[],
+          deep_clean:!!(prop.schedule||[]).find(function(s){return(s.cleanerId===user.id||s.cleanerId2===user.id)&&s.deepClean;}),
+          duration_seconds:newJob.duration||0,
+          completed_at:newJob.completedAt,
+          cleaner_notes:newJob.cleanerNotes||"",
+        };
+        if(dbJob.property_id){
+          createJob(dbJob).then(function(saved){
+            if(saved&&saved.id){
+              // Update local job with real DB id
+              setJobs(function(js){return js.map(function(j){
+                return j.id===newJob.id?Object.assign({},j,{dbId:saved.id}):j;
+              });});
+            }
+          }).catch(function(e){console.error("Job create failed:",e.message);});
+        }
+      }
     }
     setProps(function(ps){return ps.map(function(p){
       if(p.id!==prop.id)return p;
@@ -6559,6 +6625,8 @@ function Messages({user,cleaners,addNotification}){
       return s?JSON.parse(s):{};
     }catch(e){return {};}
   });
+  // Load messages from Supabase when a real user selects a contact
+  const [msgsLoaded,setMsgsLoaded]=useState({});
   const [input,setInput]=useState("");
   const [mediaPreview,setMediaPreview]=useState(null); // {url, type:'image'|'video', name}
 
@@ -6566,6 +6634,32 @@ function Messages({user,cleaners,addNotification}){
   var contactList=isManager
     ?cleaners
     :[{id:"mgr1",name:"Harvey Johnson",avatar:"HJ",role:"manager",email:"manager@turnready.app"}];
+
+  // Load messages from Supabase when contact is selected
+  useEffect(function(){
+    if(!selCleaner||!user||!user.id||user.id.length<10)return;
+    if(msgsLoaded[selCleaner.id]||!selCleaner.id||selCleaner.id.length<10)return;
+    getMessages(user.id,selCleaner.id).then(function(dbMsgs){
+      if(dbMsgs&&dbMsgs.length>0){
+        var mapped=dbMsgs.map(function(m){
+          return {
+            id:m.id,
+            role:m.from_id===user.id?(isManager?"manager":"cleaner"):(isManager?"cleaner":"manager"),
+            text:m.text||"",
+            media:m.media_url?{url:m.media_url,type:m.media_type,name:m.media_name}:null,
+            time:new Date(m.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
+          };
+        });
+        var key=isManager?selCleaner.id:user.id;
+        setMsgs(function(prev){
+          var updated=Object.assign({},prev);
+          updated[key]=mapped;
+          return updated;
+        });
+        setMsgsLoaded(function(prev){return Object.assign({},prev,{[selCleaner.id]:true});});
+      }
+    }).catch(function(e){console.error("Messages load failed:",e.message);});
+  },[selCleaner]);
 
   function send(){
     if(!input.trim()&&!mediaPreview||!selCleaner)return;
@@ -6575,6 +6669,18 @@ function Messages({user,cleaners,addNotification}){
       media:mediaPreview?{url:mediaPreview.url,type:mediaPreview.type,name:mediaPreview.name}:null,
       time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})};
     setInput(""); setMediaPreview(null);
+    // Save to Supabase if real users
+    if(user&&user.id&&user.id.length>10&&selCleaner&&selCleaner.id&&selCleaner.id.length>10){
+      var toId=isManager?selCleaner.id:selCleaner.id; // manager sends to cleaner, cleaner sends to manager
+      sendMessage({
+        from_id:user.id,
+        to_id:toId,
+        text:newMsg.text||null,
+        media_url:newMsg.media?newMsg.media.url:null,
+        media_type:newMsg.media?newMsg.media.type:null,
+        media_name:newMsg.media?newMsg.media.name:null,
+      }).catch(function(e){console.error("Message save failed:",e.message);});
+    }
     setMsgs(function(prev){
       var updated=Object.assign({},prev);
       updated[key]=(prev[key]||[]).concat([newMsg]);
@@ -7330,13 +7436,36 @@ function ProfilePage({user,setUser,cleaners,setCleaners,jobs,setShowMgrStripe}){
     setSaved(true);
     setEditing(false);
     setTimeout(function(){setSaved(false);},2500);
+    // Save to Supabase if real user
+    if(user&&user.id&&user.id.length>10){
+      var dbUpdates={
+        name:updated.name,
+        phone:updated.phone||null,
+        avatar:updated.avatar||null,
+      };
+      if(isManager){
+        dbUpdates.business_name=updated.businessName||null;
+      }
+      // Compress profile photo before saving
+      if(updated.photo&&updated.photo.startsWith("data:image")){
+        compressImage(updated.photo,400,400,0.8,function(compressed){
+          updateUserProfile(user.id,Object.assign({},dbUpdates,{photo:compressed})).catch(function(e){console.error("Profile save failed:",e.message);});
+        });
+      } else {
+        updateUserProfile(user.id,dbUpdates).catch(function(e){console.error("Profile save failed:",e.message);});
+      }
+    }
   }
 
   function handlePhoto(e){
     var file=e.target.files[0];
     if(!file)return;
     var reader=new FileReader();
-    reader.onload=function(ev){setPhoto(ev.target.result);};
+    reader.onload=function(ev){
+      compressImage(ev.target.result,400,400,0.85,function(compressed){
+        setPhoto(compressed);
+      });
+    };
     reader.readAsDataURL(file);
   }
 
@@ -8776,10 +8905,44 @@ export default function App() {
       if(profile){
         // Mark as real user so demo data doesn't load
         try{localStorage.setItem("turnready_is_real_user","true");}catch(e){}
-        setUser(profile);
+        // Map DB field names to app field names
+        var mappedProfile=Object.assign({},profile,{
+          stripeStatus:profile.stripe_status||"pending",
+          stripeAccount:profile.stripe_account_id||null,
+          stripeBusinessStatus:profile.stripe_business_status||"not_connected",
+          stripeBusinessAccount:profile.stripe_business_account||null,
+          businessName:profile.business_name||null,
+          totalEarned:profile.total_earned||0,
+          jobsCompleted:profile.jobs_completed||0,
+          joinedAt:profile.joined_at||profile.created_at,
+        });
+        setUser(mappedProfile);
         if(profile.role==="cleaner")setView("Home");
         if(profile.role==="manager"){
           setView("Dashboard");
+          // Load jobs from Supabase on session restore
+          getJobs({}).then(function(dbJobs){
+            if(dbJobs&&dbJobs.length>0){
+              var mappedJobs=dbJobs.map(function(j){
+                return Object.assign({},j,{
+                  dbId:j.id,
+                  id:j.id,
+                  propertyId:j.property_id,
+                  propertyName:j.property_name,
+                  cleanerId:j.cleaner_id,
+                  completedAt:j.completed_at,
+                  paidAt:j.paid_at,
+                  startedAt:j.started_at,
+                  rejectReason:j.rejection_reason,
+                  durationStr:j.duration_seconds?Math.floor(j.duration_seconds/3600)+"h "+Math.floor((j.duration_seconds%3600)/60)+"m":"",
+                  tasks:j.tasks||[],
+                  inventory:j.inventory||[],
+                  uploads:j.uploads||[],
+                });
+              });
+              setJobs(mappedJobs);
+            }
+          }).catch(function(e){console.error("Jobs load failed:",e.message);});
           // Load properties from Supabase on session restore
           getProperties(profile.id).then(function(dbProps){
             if(dbProps&&dbProps.length>0){
@@ -8942,9 +9105,11 @@ export default function App() {
         // Strip large base64 videos from rooms before syncing (keep photos only, compress separately)
         var roomsForSync=(p.rooms||[]).map(function(r){
           return Object.assign({},r,{
-            // Keep ref photos (compressed) but strip large videos to avoid payload limits
-            video: r.video&&r.video.length<500000?r.video:null, // Max ~375KB for video thumbnails
-            preVideo: r.preVideo&&r.preVideo.length<500000?r.preVideo:null,
+            // Keep videos up to 8MB base64 (~6MB actual file)
+            video: r.video&&r.video.length<10000000?r.video:null,
+            preVideo: r.preVideo&&r.preVideo.length<10000000?r.preVideo:null,
+            // Ref video also keep up to 8MB
+            refVideo: r.refVideo&&r.refVideo.length<10000000?r.refVideo:null,
           });
         });
         updateProperty(p.id,{
@@ -9431,7 +9596,7 @@ export default function App() {
         {/* Connect Stripe button */}
         <button onClick={function(){
           var acct="acct_"+Date.now();
-          var updatedUser=Object.assign({},user,{stripeStatus:"connected",stripeAccount:acct});
+          var updatedUser=Object.assign({},user,{stripeStatus:"connected",stripeAccount:acct,stripe_status:"connected",stripe_account_id:acct});
           setCleaners(function(cs){return cs.map(function(c){
             return c.id!==user.id?c:Object.assign({},c,{stripeStatus:"connected",stripeAccount:acct});
           });});
@@ -9444,6 +9609,10 @@ export default function App() {
             else existing.push(updatedUser);
             localStorage.setItem("turnready_cleaners",JSON.stringify(existing));
           }catch(e){}
+          // Save to Supabase
+          if(user&&user.id){
+            updateUserProfile(user.id,{stripe_status:"connected",stripe_account_id:acct}).catch(function(e){console.error("Cleaner Stripe save:",e.message);});
+          }
           setShowOnboarding(false);
           setOnboardingStep("welcome");
         }} style={{width:"100%",background:"#635BFF",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer",marginBottom:10}}>
@@ -9532,12 +9701,19 @@ export default function App() {
       </div>
 
       <div style={{padding:"16px 24px 32px",borderTop:"1px solid #2A2A2A"}}>
-        <button onClick={function(){
+        <button onClick={async function(){
           var acct="acct_mgr_"+Date.now();
-          var updated=Object.assign({},user,{stripeBusinessStatus:"connected",stripeBusinessAccount:acct});
+          var updated=Object.assign({},user,{stripeBusinessStatus:"connected",stripeBusinessAccount:acct,stripe_business_status:"connected",stripe_business_account:acct});
           setUser(updated);
           setShowMgrStripe(false);
           setView("Dashboard");
+          // Save to Supabase
+          if(user&&user.id&&user.id!=="mgr1"){
+            try{
+              var {updateUserProfile}=await import("./lib/supabase.js");
+              await updateUserProfile(user.id,{stripe_business_status:"connected",stripe_business_account:acct});
+            }catch(e){console.error("Stripe save failed:",e.message);}
+          }
         }} style={{width:"100%",background:"#635BFF",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer",marginBottom:10}}>
           💳 CONNECT STRIPE BUSINESS ACCOUNT
         </button>
