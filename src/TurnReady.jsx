@@ -921,6 +921,8 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
         totalEarned:profile.total_earned||0,
         jobsCompleted:profile.jobs_completed||0,
         joinedAt:profile.joined_at||profile.created_at,
+        photo:profile.photo||null,
+        avatar:profile.avatar||null,
       });
       onLogin(mappedProfile);
     }catch(e){
@@ -7529,10 +7531,18 @@ function ProfilePage({user,setUser,cleaners,setCleaners,jobs,setShowMgrStripe}){
       if(isManager){
         dbUpdates.business_name=updated.businessName||null;
       }
-      // Compress profile photo before saving
+      // Upload profile photo to Supabase Storage (not base64 in DB)
       if(updated.photo&&updated.photo.startsWith("data:image")){
-        compressImage(updated.photo,400,400,0.8,function(compressed){
-          updateUserProfile(user.id,Object.assign({},dbUpdates,{photo:compressed})).catch(function(e){console.error("Profile save failed:",e.message);});
+        compressImage(updated.photo,400,400,0.85,function(compressed){
+          // Upload to Storage
+          uploadImageToStorage("profile-photos","users/"+user.id+"/profile.jpg",compressed).then(function(publicUrl){
+            setUser(function(u){return Object.assign({},u,{photo:publicUrl});});
+            updateUserProfile(user.id,Object.assign({},dbUpdates,{photo:publicUrl})).catch(function(e){console.error("Profile save failed:",e.message);});
+          }).catch(function(e){
+            console.error("Profile photo upload failed:",e.message);
+            // Fall back to base64
+            updateUserProfile(user.id,Object.assign({},dbUpdates,{photo:compressed})).catch(function(e2){console.error("Profile save failed:",e2.message);});
+          });
         });
       } else {
         updateUserProfile(user.id,dbUpdates).catch(function(e){console.error("Profile save failed:",e.message);});
@@ -8998,8 +9008,11 @@ export default function App() {
           totalEarned:profile.total_earned||0,
           jobsCompleted:profile.jobs_completed||0,
           joinedAt:profile.joined_at||profile.created_at,
+          photo:profile.photo||null,
+          avatar:profile.avatar||null,
         });
         setUser(mappedProfile);
+        try{localStorage.setItem("turnready_session_user",JSON.stringify({id:profile.id,role:profile.role}));}catch(e){}
         if(profile.role==="cleaner")setView("Home");
         if(profile.role==="manager"){
           setView("Dashboard");
@@ -9026,7 +9039,11 @@ export default function App() {
               setJobs(mappedJobs);
             }
           }).catch(function(e){console.error("Jobs load failed:",e.message);});
-          // Load properties from Supabase on session restore
+          // Load properties - show cache IMMEDIATELY, then refresh from Supabase
+          try{
+            var cachedProps=localStorage.getItem("tr_props_"+profile.id);
+            if(cachedProps){var cp=JSON.parse(cachedProps);if(cp&&cp.length)setProps(cp);}
+          }catch(e){}
           getProperties(profile.id).then(function(dbProps){
             if(dbProps&&dbProps.length>0){
               var mapped=dbProps.map(function(p){
@@ -9042,18 +9059,18 @@ export default function App() {
                   supplyInfo:p.supply_info||"",
                   alarmCode:p.alarm_code||"",
                   linenRate:p.linen_rate||10,
+                  linenBags:p.linen_bags||0,
                   totalBeds:p.total_beds||1,
                   assignedTo:p.assigned_to||null,
                 });
               });
               setProps(mapped);
+              try{localStorage.setItem("tr_props_"+profile.id,JSON.stringify(mapped));}catch(e){}
             } else {
-              // Fall back to localStorage
               try{
                 var stored=localStorage.getItem("turnready_shared_props");
                 if(stored){var sp=JSON.parse(stored);if(sp&&sp.length)setProps(sp);}
-                else if(profile.id==="mgr1")setProps(INIT_PROPS);
-              }catch(e){if(profile.id==="mgr1")setProps(INIT_PROPS);}
+              }catch(e){}
             }
           }).catch(function(){
             try{
@@ -9123,10 +9140,20 @@ export default function App() {
   }, [darkMode]);
   const INVITE_CODE = "HARVEY2024";
   const [props, setProps] = useState(function(){
-    // Only load demo props if no real Supabase session
     try{
       var flag=localStorage.getItem("turnready_is_real_user");
-      if(flag==="true")return []; // Real user - start empty, load from Supabase
+      if(flag==="true"){
+        // Real user - try to load from cache first for instant display
+        var sessionUser=localStorage.getItem("turnready_session_user");
+        if(sessionUser){
+          var su=JSON.parse(sessionUser);
+          if(su&&su.id){
+            var cached=localStorage.getItem("tr_props_"+su.id);
+            if(cached){var cp=JSON.parse(cached);if(cp&&cp.length)return cp;}
+          }
+        }
+        return []; // No cache yet - start empty, load from Supabase
+      }
       var stored=localStorage.getItem("turnready_shared_props");
       if(stored){var sp=JSON.parse(stored);if(sp&&sp.length)return sp;}
     }catch(e){}
@@ -9226,6 +9253,16 @@ export default function App() {
           linenBags:p.linenBags,
           assignedTo:p.assignedTo,
           guest_rating:p.guestRating,
+        }).then(function(){
+          // Update cache after successful sync
+          try{
+            var uid=null;
+            try{
+              var s=localStorage.getItem("turnready_session_user");
+              if(s){var u=JSON.parse(s);uid=u&&u.id;}
+            }catch(e){}
+            if(uid)localStorage.setItem("tr_props_"+uid,JSON.stringify(props));
+          }catch(e){}
         }).catch(function(e){
           console.error("❌ Supabase sync failed for property",p.id,"Error:",e.message,"Code:",e.code);
         });
