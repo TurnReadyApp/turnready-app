@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { supabase, signIn, signUp, signOut, getCurrentUser, getTeamCleaners, getProperties, getJobs, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications } from "./lib/supabase.js";
 
 
 
@@ -820,6 +821,7 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
       }
     });
   }
+  const [loading,setLoading]=useState(false);
   const [showForgot,setShowForgot]=useState(false);
   const [signupDone,setSignupDone]=useState(false);
   const [inviteInput,setInviteInput]=useState("");
@@ -835,21 +837,29 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
     setShowTos(false);
   }
 
-  function doLogin(){
-    if(email===MANAGER_ACCOUNT.email&&pwd===MANAGER_ACCOUNT.password){
-      setErr("");
+  async function doLogin(){
+    if(!email.trim()||!pwd.trim()){setErr("Please enter your email and password.");return;}
+    setLoading(true);setErr("");
+    try{
+      // Try Supabase auth first
+      var data=await signIn({email:email.trim(),password:pwd});
+      var profile=await getCurrentUser();
+      if(!profile){setErr("Account not found. Please contact your manager.");setLoading(false);return;}
       try{localStorage.setItem("turnready_bio_email",email);localStorage.setItem("turnready_bio_pwd",pwd);}catch(e){}
-      onLogin(MANAGER_ACCOUNT);return;
+      setLoading(false);
+      onLogin(profile);
+    }catch(e){
+      // Fall back to demo accounts if Supabase fails
+      if(email===MANAGER_ACCOUNT.email&&pwd===MANAGER_ACCOUNT.password){
+        setErr("");setLoading(false);
+        try{localStorage.setItem("turnready_bio_email",email);localStorage.setItem("turnready_bio_pwd",pwd);}catch(ex){}
+        onLogin(MANAGER_ACCOUNT);return;
+      }
+      var cl=(cleaners||[]).find(function(c){return c.email===email.trim().toLowerCase()&&c.password===pwd;});
+      if(cl){setErr("");setLoading(false);onLogin({...cl,role:"cleaner"});return;}
+      setLoading(false);
+      setErr(e.message||"Invalid email or password. Please try again.");
     }
-    var cl=(cleaners||[]).find(c=>c.email===email.trim().toLowerCase()&&c.password===pwd);
-    if(cl){
-      setErr("");
-      try{localStorage.setItem("turnready_bio_email",email);localStorage.setItem("turnready_bio_pwd",pwd);}catch(e){}
-      onLogin({...cl,role:"cleaner"});return;
-    }
-    var pend=(pending||[]).find(p=>p.email===email);
-    if(pend){setErr("");onLogin({...pend,role:"pending"});return;}
-    setErr("Invalid email or password. Please try again.");
   }
 
   var badge=<div style={{textAlign:"center",marginBottom:24}}>
@@ -944,7 +954,9 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
             <button onClick={()=>setShowForgot(true)} style={{background:"none",border:"none",color:"#CC0000",fontSize:11,cursor:"pointer",fontFamily:"Inter,sans-serif",padding:"4px 0"}}>Forgot Password?</button>
           </div>
           {err&&<div style={{color:"#EF4444",fontSize:12,marginBottom:12,textAlign:"center"}}>{err}</div>}
-          <button className="btn" style={{width:"100%",padding:13,fontSize:14,background:err?"rgba(204,0,0,.35)":undefined}} onClick={function(){if(!tosOk){setShowTos(true);}else{doLogin();}}}>SIGN IN</button>
+          <button className="btn" style={{width:"100%",padding:13,fontSize:14,background:loading?"#555":err?"rgba(204,0,0,.35)":undefined}} disabled={loading} onClick={function(){if(!tosOk){setShowTos(true);}else{doLogin();}}}>
+              {loading?"SIGNING IN...":"SIGN IN"}
+            </button>
 
           {/* Fingerprint / Face ID button */}
           {localStorage.getItem("turnready_bio_email")&&(
@@ -1000,35 +1012,36 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
             <input value={inviteInput} onChange={function(e){setInviteInput(e.target.value.toUpperCase());setErr("");}} placeholder="e.g. HARVEY2024" style={{marginTop:6,letterSpacing:2,fontWeight:700}}/>
           </div>
           {err&&<div style={{color:"#EF4444",fontSize:12,marginBottom:12}}>{err}</div>}
-          <button className="btn" style={{width:"100%",padding:13}} onClick={function(){
+          <button className="btn" style={{width:"100%",padding:13}} onClick={async function(){
             if(!name||!email||!phone||!pwd){setErr("Please fill in all fields.");return;}
             if(pwd.length<8){setErr("Password must be at least 8 characters.");return;}
             if(pwd!==pwd2){setErr("Passwords do not match.");return;}
-            var exists=(cleaners||[]).find(function(c){return c.email===email.trim().toLowerCase();});
-            if(exists){setErr("An account with this email already exists.");return;}
             var codeOk=inviteInput.trim().toUpperCase()===inviteCode;
-            if(codeOk){
-              var initials=name.trim().split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase();
-              var nc={id:"c"+Date.now(),name:name.trim(),email:email.trim().toLowerCase(),phone:phone.trim(),password:pwd,totalEarned:0,jobsCompleted:0,rating:5.0,avatar:initials,role:"backup",reviews:[],joinedAt:new Date().toISOString()};
-              // Save immediately to localStorage before state update
-              try{
-                var existing=[];
-                var stored=localStorage.getItem("turnready_cleaners");
-                if(stored)existing=JSON.parse(stored);
-                // avoid duplicate
-                var already=existing.find(function(c){return c.id===nc.id;});
-                if(!already)existing.push(nc);
-                localStorage.setItem("turnready_cleaners",JSON.stringify(existing));
-              }catch(e){}
-              setCleaners(function(cs){return cs.concat([nc]);});
-              onLogin(Object.assign({},nc,{role:"cleaner"}),true,nc);
-            } else if(inviteInput.trim()===""){
-              setPending(function(ps){return ps.concat([{id:"pend"+Date.now(),name:name.trim(),email:email.trim(),phone:phone.trim(),password:pwd,appliedAt:new Date().toISOString()}]);});
-              setSignupDone(true);
-            } else {
-              setErr("Invalid invite code. Ask your manager for the correct code.");return;
+            setLoading(true);setErr("");
+            try{
+              if(codeOk||inviteInput.trim()===""){
+                await signUp({email:email.trim().toLowerCase(),password:pwd,name:name.trim(),role:"cleaner",inviteCode:codeOk?inviteInput.trim().toUpperCase():null,phone:phone.trim()});
+                if(codeOk){
+                  await signIn({email:email.trim().toLowerCase(),password:pwd});
+                  var profile=await getCurrentUser();
+                  setLoading(false);
+                  onLogin(profile,true,profile);
+                } else {
+                  setLoading(false);setSignupDone(true);
+                }
+              } else {
+                setLoading(false);setErr("Invalid invite code. Ask your manager for the correct code.");
+              }
+            }catch(e){
+              setLoading(false);
+              if(codeOk){
+                var av=name.trim().split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase();
+                var nc={id:"c"+Date.now(),name:name.trim(),email:email.trim().toLowerCase(),phone:phone.trim(),password:pwd,totalEarned:0,jobsCompleted:0,rating:5.0,avatar:av,role:"backup",reviews:[],joinedAt:new Date().toISOString()};
+                setCleaners(function(cs){return cs.concat([nc]);});
+                onLogin(Object.assign({},nc,{role:"cleaner"}),true,nc);
+              } else { setErr(e.message||"Sign up failed. Please try again."); }
             }
-          }}>{inviteInput.trim()?"JOIN NOW":"Apply to Join"}</button>
+          }}>{loading?"PLEASE WAIT...":inviteInput.trim()?"JOIN NOW":"Apply to Join"}</button>
           <div style={{fontSize:11,color:"#555",textAlign:"center",marginTop:10}}>
             {inviteInput.trim()?"Valid code: you will be signed in immediately.":"No invite code? Your application will be reviewed by the manager."}
           </div>
@@ -1063,14 +1076,28 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
             <input value={pwd} onChange={function(e){setPwd(e.target.value);}} placeholder="Re-enter your password" type="password" style={{marginTop:6}}/>
           </div>
           {err&&<div style={{color:"#EF4444",fontSize:12,marginBottom:12}}>{err}</div>}
-          <button className="btn" style={{width:"100%",padding:14,fontSize:13,marginBottom:10}} onClick={function(){
+          <button className="btn" style={{width:"100%",padding:14,fontSize:13,marginBottom:10}} onClick={async function(){
             if(!name||!name2||!email||!pwd2){setErr("Please fill in all required fields.");return;}
             if(pwd2.length<8){setErr("Password must be at least 8 characters.");return;}
             if(pwd2!==pwd){setErr("Passwords do not match.");return;}
-            var newMgr={id:"mgr"+Date.now(),name:name2,businessName:name,email:email.trim().toLowerCase(),phone:phone.trim(),password:pwd2,role:"manager",plan:"trial",trialStart:new Date().toISOString(),avatar:initials(name2),stripeBusinessStatus:"not_connected"};
-            try{var mgrs=JSON.parse(localStorage.getItem("turnready_managers")||"[]");mgrs.push(newMgr);localStorage.setItem("turnready_managers",JSON.stringify(mgrs));}catch(e){}
-            onLogin(newMgr,true);
-          }}>Start 7-Day Free Trial →</button>
+            setLoading(true);setErr("");
+            try{
+              await signUp({email:email.trim().toLowerCase(),password:pwd2,name:name2.trim(),role:"manager",phone:phone.trim()});
+              await signIn({email:email.trim().toLowerCase(),password:pwd2});
+              var profile=await getCurrentUser();
+              if(profile){
+                profile.business_name=name.trim();
+                profile.businessName=name.trim();
+                profile.stripeBusinessStatus="not_connected";
+              }
+              setLoading(false);
+              onLogin(profile||{id:"mgr"+Date.now(),name:name2,businessName:name,email:email.trim().toLowerCase(),role:"manager",plan:"trial",avatar:name2.split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),stripeBusinessStatus:"not_connected"},true);
+            }catch(e){
+              setLoading(false);
+              var newMgr={id:"mgr"+Date.now(),name:name2,businessName:name,email:email.trim().toLowerCase(),phone:phone.trim(),password:pwd2,role:"manager",plan:"trial",trialStart:new Date().toISOString(),avatar:name2.split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),stripeBusinessStatus:"not_connected"};
+              onLogin(newMgr,true);
+            }
+          }}>{loading?"CREATING ACCOUNT...":"Start 7-Day Free Trial →"}</button>
           <div style={{fontSize:10,color:"#555",textAlign:"center"}}>Credit card required after trial. Cancel anytime.</div>
         </div>}
 
@@ -8529,7 +8556,22 @@ function NotificationsPanel({notifications,setNotifications,onClose,user,setView
 export default function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("Dashboard");
+  const [authLoading, setAuthLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(function(){try{return localStorage.getItem("turnready_theme")!=="light";}catch(e){return true;}});
+
+  // Restore session on app load
+  useEffect(function(){
+    getCurrentUser().then(function(profile){
+      if(profile){
+        setUser(profile);
+        if(profile.role==="cleaner")setView("Home");
+        if(profile.role==="manager")setView("Dashboard");
+      }
+      setAuthLoading(false);
+    }).catch(function(){
+      setAuthLoading(false);
+    });
+  },[]);
   C = darkMode?DARK_THEME:LIGHT_THEME;
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState("welcome"); // "welcome" | "stripe"
@@ -8819,6 +8861,7 @@ export default function App() {
     else if((user&&user.role)==="cleaner") setView("Home");
   },[user]);
 
+  if(authLoading) return (<div style={{minHeight:"100vh",background:"#0D0D0D",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}><style>{css}</style><div style={{fontFamily:"Arial Black,sans-serif",fontSize:22,fontWeight:900,letterSpacing:1}}><span style={{color:"#FFF"}}>TURN</span><span style={{color:"#CC0000"}}>READY</span></div><div style={{color:"#888",fontSize:13}}>Loading...</div></div>);
   if(!user) return (<div><style>{css}</style><Login onLogin={function(u,isNew,newCleaner){
             setUser(u);
             if(u.role==="cleaner")setView("Home");
@@ -9180,14 +9223,18 @@ export default function App() {
             if(n.forRole==="cleaner")return user&&user.role==="cleaner"&&(!n.forCleaner||n.forCleaner===user.id);
             return true;
           })}
-          onLogout={function(){
-            // Restore Harvey's demo data for next login
-            // Props and jobs persist in localStorage, loaded fresh on next login
+          onLogout={async function(){
+            try{await signOut();}catch(e){}
             setUser(null);
             setShowOnboarding(false);
             setOnboardingStep("welcome");
             setShowMgrStripe(false);
-          }} openAI={()=>setShowAI(true)} onBell={()=>setShowNotifs(true)} darkMode={darkMode} setDarkMode={function(v){setDarkMode(v);try{localStorage.setItem("turnready_theme",v?"dark":"light");}catch(e){}}} />
+            setProps(INIT_PROPS);
+            setCleaners(INIT_CLEANERS);
+            setJobs(INIT_JOBS);
+            setNotifications([]);
+          }}
+          openAI={function(){setShowAI(true);}} onBell={function(){setShowNotifs(true);}} darkMode={darkMode} setDarkMode={function(v){setDarkMode(v);try{localStorage.setItem("turnready_theme",v?"dark":"light");}catch(e){}}}/>
         <div style={{maxWidth:1080,margin:"0 auto",padding:"60px 16px 80px"}}>{renderView()}</div>
         {showNotifs&&<NotificationsPanel
           notifications={notifications.filter(function(n){
