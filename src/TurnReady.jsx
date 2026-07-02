@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { supabase, signIn, signUp, signOut, getCurrentUser, updateUserProfile, getTeamCleaners, getProperties, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications } from "./lib/supabase.js";
+import { supabase, signIn, signUp, signOut, getCurrentUser, updateUserProfile, getTeamCleaners, getProperties, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications, uploadVideoToStorage, uploadImageToStorage, isStorageUrl } from "./lib/supabase.js";
 
 
 
@@ -2088,20 +2088,61 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                       <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
                         🎬 Record
                         <input type="file" accept="video/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                          onChange={function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev.target.result});})});});});};reader.readAsDataURL(file);}}/>
+                          onChange={function(e){
+                            var file=e.target.files[0];if(!file)return;
+                            var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(ex){}
+                            if(isReal&&prop.id&&prop.id.length>20){
+                              var ov=URL.createObjectURL(file);
+                              setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ov,refVideoUploading:true});})});});});
+                              var rd=new FileReader();rd.onload=function(ev2){
+                                uploadVideoToStorage("room-videos","rooms/"+prop.id+"/"+r.id+"/ref-"+Date.now()+".mp4",ev2.target.result,file.type||"video/mp4").then(function(url){
+                                  setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:url,refVideoUploading:false});})});});});
+                                }).catch(function(){
+                                  var rd2=new FileReader();rd2.onload=function(ev3){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev3.target.result,refVideoUploading:false});})});});});};rd2.readAsDataURL(file);
+                                });
+                              };rd.readAsDataURL(file);
+                            } else {
+                              var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev.target.result});})});});});};reader.readAsDataURL(file);
+                            }
+                          }}/>
                       </label>
                     )}
                     {!r.refVideo&&(
                       <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
                         📁 Video
                         <input type="file" accept="video/*" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                          onChange={function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev.target.result});})});});});};reader.readAsDataURL(file);}}/>
+                          onChange={function(e){
+                            var file=e.target.files[0];if(!file)return;
+                            var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(ex){}
+                            if(isReal&&prop.id&&prop.id.length>20){
+                              var ov=URL.createObjectURL(file);
+                              setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ov,refVideoUploading:true});})});});});
+                              var rd=new FileReader();rd.onload=function(ev2){
+                                uploadVideoToStorage("room-videos","rooms/"+prop.id+"/"+r.id+"/ref-"+Date.now()+".mp4",ev2.target.result,file.type||"video/mp4").then(function(url){
+                                  setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:url,refVideoUploading:false});})});});});
+                                }).catch(function(){
+                                  var rd2=new FileReader();rd2.onload=function(ev3){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev3.target.result,refVideoUploading:false});})});});});};rd2.readAsDataURL(file);
+                                });
+                              };rd.readAsDataURL(file);
+                            } else {
+                              var reader=new FileReader();reader.onload=function(ev){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ev.target.result});})});});});};reader.readAsDataURL(file);
+                            }
+                          }}/>
                       </label>
                     )}
                   {/* Photo Comparison */}
                                     {/* Cleaner Uploads Section - always visible to manager */}
                   <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #2A2A2A"}}>
                     <div style={{fontSize:10,color:"#CC0000",fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>🎥 CLEANER AFTER-CLEAN VIDEO</div>
+                    {r.videoUploading&&(
+                      <div style={{background:"rgba(99,91,255,.08)",border:"1px solid rgba(99,91,255,.3)",borderRadius:8,padding:"10px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{width:16,height:16,border:"2px solid #8B5CF6",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+                        <span style={{fontSize:11,color:"#8B5CF6",fontWeight:600}}>Uploading video to cloud...</span>
+                      </div>
+                    )}
+                    {r.video&&!r.videoUploading&&r.video.startsWith("blob:")&&(
+                      <div style={{fontSize:10,color:"#F59E0B",marginBottom:6}}>⚠️ Preview only — saving to cloud...</div>
+                    )}
                     {r.video?(
                       <div>
                         <div style={{position:"relative",cursor:"pointer"}} onClick={function(){
@@ -5293,17 +5334,59 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
 
   function uploadRoomVideo(propId,roomId,file){
     if(!file)return;
-    var reader=new FileReader();
-    reader.onload=function(ev){
+    var isReal=false;
+    try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
+    
+    // For real users with real property IDs, upload to Supabase Storage
+    if(isReal && propId && propId.length > 20){
+      // Show preview immediately using object URL
+      var objectUrl=URL.createObjectURL(file);
       setProps(function(ps){return ps.map(function(p){
         if(p.id!==propId)return p;
         return Object.assign({},p,{rooms:(p.rooms||[]).map(function(r){
           if(r.id!==roomId)return r;
-          return Object.assign({},r,{video:ev.target.result,videoName:file.name});
+          return Object.assign({},r,{video:objectUrl,videoName:file.name,videoUploading:true});
         })});
       });});
-    };
-    reader.readAsDataURL(file);
+      // Upload to Supabase Storage
+      var path="rooms/"+propId+"/"+roomId+"/after-clean-"+Date.now()+".mp4";
+      var reader2=new FileReader();
+      reader2.onload=function(ev){
+        uploadVideoToStorage("room-videos",path,ev.target.result,file.type||"video/mp4").then(function(publicUrl){
+          setProps(function(ps){return ps.map(function(p){
+            if(p.id!==propId)return p;
+            return Object.assign({},p,{rooms:(p.rooms||[]).map(function(r){
+              if(r.id!==roomId)return r;
+              return Object.assign({},r,{video:publicUrl,videoName:file.name,videoUploading:false});
+            })});
+          });});
+        }).catch(function(e){
+          console.error("Video upload to Storage failed:",e.message);
+          // Fall back to base64
+          setProps(function(ps){return ps.map(function(p){
+            if(p.id!==propId)return p;
+            return Object.assign({},p,{rooms:(p.rooms||[]).map(function(r){
+              if(r.id!==roomId)return r;
+              return Object.assign({},r,{video:ev.target.result,videoName:file.name,videoUploading:false});
+            })});
+          });});
+        });
+      };
+      reader2.readAsDataURL(file);
+    } else {
+      // Demo/local mode - use base64
+      var reader=new FileReader();
+      reader.onload=function(ev){
+        setProps(function(ps){return ps.map(function(p){
+          if(p.id!==propId)return p;
+          return Object.assign({},p,{rooms:(p.rooms||[]).map(function(r){
+            if(r.id!==roomId)return r;
+            return Object.assign({},r,{video:ev.target.result,videoName:file.name});
+          })});
+        });});
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   function submit(prop){
@@ -9105,11 +9188,15 @@ export default function App() {
         // Strip large base64 videos from rooms before syncing (keep photos only, compress separately)
         var roomsForSync=(p.rooms||[]).map(function(r){
           return Object.assign({},r,{
-            // Keep videos up to 8MB base64 (~6MB actual file)
-            video: r.video&&r.video.length<10000000?r.video:null,
-            preVideo: r.preVideo&&r.preVideo.length<10000000?r.preVideo:null,
-            // Ref video also keep up to 8MB
-            refVideo: r.refVideo&&r.refVideo.length<10000000?r.refVideo:null,
+            // If video is a Storage URL (https://), keep it as-is
+            // If video is base64 and under 8MB, keep it
+            // If video is base64 and over 8MB (huge), strip it
+            video: r.video?(r.video.startsWith("http")?r.video:(r.video.length<10000000?r.video:null)):null,
+            preVideo: r.preVideo?(r.preVideo.startsWith("http")?r.preVideo:(r.preVideo.length<10000000?r.preVideo:null)):null,
+            refVideo: r.refVideo?(r.refVideo.startsWith("http")?r.refVideo:(r.refVideo.length<10000000?r.refVideo:null)):null,
+            // Strip object URLs (blob:) - these are temporary preview URLs
+            videoUploading: false,
+            refVideoUploading: false,
           });
         });
         updateProperty(p.id,{
