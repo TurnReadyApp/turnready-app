@@ -2611,10 +2611,11 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
   const [assignTarget,setAssignTarget]=useState(null);
   const [form,setForm]=useState({name:"",address:"",type:"Airbnb",pay:"",bedrooms:"",bathrooms:"",description:"",photo:""});
 
-  function addProp(){
+  async function addProp(){
     if(!form.name||!form.address||!form.pay)return;
+    var newId="p"+Date.now();
     setProps(ps=>[...ps,{
-      id:"p"+(Date.now()),
+      id:newId,
       ...form,pay:Number(form.pay),bedrooms:Number(form.bedrooms)||1,bathrooms:Number(form.bathrooms)||1,
       photo:form.photo||"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",
       status:"available",assignedTo:null,scheduledDate:"",scheduledTime:"",notes:"",checkIn:"16:00",checkOut:"11:00",sameDay:false,extraDetails:[],
@@ -2643,6 +2644,37 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
         {id:"r3",name:"Bathroom",icon:"🚿",guide:"Stage towels, clean mirror.",clip:"Bathroom towel staging.",refPhotos:["https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=400&q=80"],refVideo:null,video:null},
       ],
     }]);
+    // Save to Supabase if user has real account
+    if(user&&user.id&&user.id!=="mgr1"){
+      var {createProperty} = await import("./lib/supabase.js").catch(function(){return {};});
+      if(createProperty){
+        try{
+          var dbProp=await createProperty({
+            manager_id:user.id,
+            name:form.name,
+            address:form.address,
+            type:form.type||"Airbnb",
+            pay:Number(form.pay),
+            bedrooms:Number(form.bedrooms)||1,
+            bathrooms:Number(form.bathrooms)||1,
+            photo:form.photo||null,
+            notes:"",
+            check_in:"4:00 PM",
+            check_out:"11:00 AM",
+            same_day:false,
+            linen_rate:10,
+            total_beds:Number(form.bedrooms)||1,
+          });
+          if(dbProp&&dbProp.id){
+            // Update the prop with real DB id
+            setProps(function(ps){return ps.map(function(p){
+              if(p.id===newId)return Object.assign({},p,{id:dbProp.id,dbId:dbProp.id});
+              return p;
+            });});
+          }
+        }catch(e){console.error("Failed to save property to Supabase:",e);}
+      }
+    }
     setForm({name:"",address:"",type:"Airbnb",pay:"",bedrooms:"",bathrooms:"",description:"",photo:""});
     setShowAdd(false);
   }
@@ -8565,7 +8597,60 @@ export default function App() {
       if(profile){
         setUser(profile);
         if(profile.role==="cleaner")setView("Home");
-        if(profile.role==="manager")setView("Dashboard");
+        if(profile.role==="manager"){
+          setView("Dashboard");
+          // Load properties from Supabase on session restore
+          getProperties(profile.id).then(function(dbProps){
+            if(dbProps&&dbProps.length>0){
+              var mapped=dbProps.map(function(p){
+                return Object.assign({},p,{
+                  schedule:p.schedule||[],
+                  tasks:p.tasks||[],
+                  rooms:p.rooms||[],
+                  inventory:p.inventory||[],
+                  checkIn:p.check_in||"4:00 PM",
+                  checkOut:p.check_out||"11:00 AM",
+                  sameDay:p.same_day||false,
+                  accessCode:p.access_code||"",
+                  supplyInfo:p.supply_info||"",
+                  alarmCode:p.alarm_code||"",
+                  linenRate:p.linen_rate||10,
+                  totalBeds:p.total_beds||1,
+                  assignedTo:p.assigned_to||null,
+                });
+              });
+              setProps(mapped);
+            } else {
+              // Fall back to localStorage
+              try{
+                var stored=localStorage.getItem("turnready_shared_props");
+                if(stored){var sp=JSON.parse(stored);if(sp&&sp.length)setProps(sp);}
+                else if(profile.id==="mgr1")setProps(INIT_PROPS);
+              }catch(e){if(profile.id==="mgr1")setProps(INIT_PROPS);}
+            }
+          }).catch(function(){
+            try{
+              var fb=localStorage.getItem("turnready_shared_props");
+              if(fb){var fp=JSON.parse(fb);if(fp&&fp.length)setProps(fp);}
+            }catch(e){}
+          });
+          // Load cleaners
+          getTeamCleaners(profile.id).then(function(dbCleaners){
+            if(dbCleaners&&dbCleaners.length>0){
+              var demoEmails=INIT_CLEANERS.map(function(c){return c.email;});
+              var realOnly=dbCleaners.filter(function(c){return demoEmails.indexOf(c.email)<0;});
+              setCleaners(INIT_CLEANERS.concat(realOnly.map(function(c){
+                return Object.assign({},c,{
+                  avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
+                  totalEarned:c.total_earned||0,
+                  jobsCompleted:c.jobs_completed||0,
+                  stripeStatus:c.stripe_status||"pending",
+                  joinedAt:c.joined_at||new Date().toISOString(),
+                });
+              })));
+            }
+          }).catch(function(){});
+        }
       }
       setAuthLoading(false);
     }).catch(function(){
@@ -8893,35 +8978,81 @@ export default function App() {
               }catch(e){
                 setProps([]);setCleaners([]);setJobs([]);setNotifications([]);
               }
-            } else if(u.role==="manager"&&u.id==="mgr1"){
-              // Harvey - load saved props from localStorage, fall back to INIT_PROPS
-              try{
-                var sharedProps=localStorage.getItem("turnready_shared_props");
-                if(sharedProps){var sp=JSON.parse(sharedProps);if(sp&&sp.length)setProps(sp);else setProps(INIT_PROPS);}
-                else{
-                  var harveyData=localStorage.getItem("turnready_mgr_mgr1");
-                  if(harveyData){var hd=JSON.parse(harveyData);if(hd.props&&hd.props.length)setProps(hd.props);else setProps(INIT_PROPS);}
-                  else setProps(INIT_PROPS);
+            } else if(u.role==="manager"){
+              // Load from Supabase first, fall back to localStorage/demo data
+              getProperties(u.id).then(function(dbProps){
+                if(dbProps&&dbProps.length>0){
+                  // Map Supabase column names to app field names
+                  var mapped=dbProps.map(function(p){
+                    return Object.assign({},p,{
+                      schedule:p.schedule||[],
+                      tasks:p.tasks||[],
+                      rooms:p.rooms||[],
+                      inventory:p.inventory||[],
+                      checkIn:p.check_in||"4:00 PM",
+                      checkOut:p.check_out||"11:00 AM",
+                      sameDay:p.same_day||false,
+                      accessCode:p.access_code||"",
+                      supplyInfo:p.supply_info||"",
+                      alarmCode:p.alarm_code||"",
+                      linenRate:p.linen_rate||10,
+                      totalBeds:p.total_beds||1,
+                      assignedTo:p.assigned_to||null,
+                    });
+                  });
+                  setProps(mapped);
+                } else {
+                  // No Supabase data yet - use localStorage or demo
+                  try{
+                    var stored=localStorage.getItem("turnready_shared_props");
+                    if(stored){var sp=JSON.parse(stored);if(sp&&sp.length){setProps(sp);return;}}
+                    var mgrStored=localStorage.getItem("turnready_mgr_"+u.id);
+                    if(mgrStored){var md=JSON.parse(mgrStored);if(md.props&&md.props.length){setProps(md.props);return;}}
+                  }catch(e){}
+                  setProps(u.id==="mgr1"?INIT_PROPS:[]);
                 }
-              }catch(e){setProps(INIT_PROPS);}
-              setCleaners(function(){
+              }).catch(function(){
+                // Fall back to localStorage on Supabase error
                 try{
-                  var stored=localStorage.getItem("turnready_cleaners");
-                  if(stored){var parsed=JSON.parse(stored);var initIds=INIT_CLEANERS.map(function(c){return c.id;});var extra=parsed.filter(function(c){return initIds.indexOf(c.id)<0;});return INIT_CLEANERS.concat(extra);}
+                  var fb=localStorage.getItem("turnready_shared_props");
+                  if(fb){var fp=JSON.parse(fb);if(fp&&fp.length){setProps(fp);return;}}
                 }catch(e){}
-                return INIT_CLEANERS;
-              }());
-              // Load saved jobs from localStorage, fall back to INIT_JOBS
+                setProps(u.id==="mgr1"?INIT_PROPS:[]);
+              });
+              // Load cleaners from Supabase
+              getTeamCleaners(u.id).then(function(dbCleaners){
+                if(dbCleaners&&dbCleaners.length>0){
+                  // Merge with demo cleaners
+                  var demoIds=INIT_CLEANERS.map(function(c){return c.email;});
+                  var realOnly=dbCleaners.filter(function(c){return demoIds.indexOf(c.email)<0;});
+                  setCleaners(INIT_CLEANERS.concat(realOnly.map(function(c){
+                    return Object.assign({},c,{
+                      avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
+                      totalEarned:c.total_earned||0,
+                      jobsCompleted:c.jobs_completed||0,
+                      stripeStatus:c.stripe_status||"pending",
+                      joinedAt:c.joined_at||new Date().toISOString(),
+                    });
+                  })));
+                } else {
+                  try{
+                    var cStored=localStorage.getItem("turnready_cleaners");
+                    if(cStored){var cp=JSON.parse(cStored);var initIds=INIT_CLEANERS.map(function(c){return c.id;});var extra=cp.filter(function(c){return initIds.indexOf(c.id)<0;});setCleaners(INIT_CLEANERS.concat(extra));return;}
+                  }catch(e){}
+                  setCleaners(INIT_CLEANERS);
+                }
+              }).catch(function(){setCleaners(INIT_CLEANERS);});
+              // Load jobs
               try{
                 var sharedJobs=localStorage.getItem("turnready_shared_jobs");
-                if(sharedJobs){var sj=JSON.parse(sharedJobs);if(sj&&sj.length)setJobs(sj);else setJobs(INIT_JOBS);}
+                if(sharedJobs){var sj=JSON.parse(sharedJobs);if(sj&&sj.length){setJobs(sj);}else setJobs(u.id==="mgr1"?INIT_JOBS:[]);}
                 else{
-                  var savedMgrData=localStorage.getItem("turnready_mgr_mgr1");
-                  if(savedMgrData){var sd=JSON.parse(savedMgrData);if(sd.jobs&&sd.jobs.length)setJobs(sd.jobs);else setJobs(INIT_JOBS);}
-                  else setJobs(INIT_JOBS);
+                  var savedMgrData=localStorage.getItem("turnready_mgr_"+u.id);
+                  if(savedMgrData){var sd=JSON.parse(savedMgrData);if(sd.jobs&&sd.jobs.length){setJobs(sd.jobs);}else setJobs(u.id==="mgr1"?INIT_JOBS:[]);}
+                  else setJobs(u.id==="mgr1"?INIT_JOBS:[]);
                 }
                 try{var sharedRem=localStorage.getItem("turnready_shared_removals");if(sharedRem){var sr=JSON.parse(sharedRem);if(sr&&sr.length)setPendingRemovals(sr);}}catch(e){}
-              }catch(e){setJobs(INIT_JOBS);}
+              }catch(e){setJobs(u.id==="mgr1"?INIT_JOBS:[]);}
             }
             // New manager - trigger Stripe setup if not connected
             if(u.role==="manager"&&isNew&&(!u.stripeBusinessStatus||u.stripeBusinessStatus==="not_connected")){
