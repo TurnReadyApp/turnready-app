@@ -474,3 +474,68 @@ export function subscribeToSlotUpdates(cleanerId, callback) {
     }, payload => callback(payload))
     .subscribe()
 }
+
+// ── STORAGE UPLOAD ─────────────────────────────────────────────────────────────
+
+export async function uploadVideoToStorage(bucket, path, base64DataUrl, mimeType) {
+  // Convert base64 data URL to a Blob
+  const base64Data = base64DataUrl.split(',')[1]
+  const byteCharacters = atob(base64Data)
+  const byteNumbers = new Array(byteCharacters.length)
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  }
+  const byteArray = new Uint8Array(byteNumbers)
+  const blob = new Blob([byteArray], { type: mimeType || 'video/mp4' })
+  
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .upload(path, blob, { 
+      cacheControl: '3600', 
+      upsert: true,
+      contentType: mimeType || 'video/mp4'
+    })
+  
+  if (error) throw error
+  
+  const { data: { publicUrl } } = supabase.storage
+    .from(bucket)
+    .getPublicUrl(path)
+  
+  return publicUrl
+}
+
+export async function uploadImageToStorage(bucket, path, base64DataUrl) {
+  // Determine mime type
+  const mimeMatch = base64DataUrl.match(/data:([^;]+);/)
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+  
+  const base64Data = base64DataUrl.split(',')[1]
+  const byteCharacters = atob(base64Data)
+  const byteNumbers = new Array(byteCharacters.length)
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  }
+  const byteArray = new Uint8Array(byteNumbers)
+  const blob = new Blob([byteArray], { type: mimeType })
+  
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .upload(path, blob, { 
+      cacheControl: '3600', 
+      upsert: true,
+      contentType: mimeType
+    })
+  
+  if (error) throw error
+  
+  const { data: { publicUrl } } = supabase.storage
+    .from(bucket)
+    .getPublicUrl(path)
+  
+  return publicUrl
+}
+
+export function isStorageUrl(str) {
+  return str && (str.startsWith('http://') || str.startsWith('https://'))
+}
