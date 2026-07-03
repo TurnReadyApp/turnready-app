@@ -1665,8 +1665,11 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
         var tasksToSave=prop.tasks&&prop.tasks.length>0?prop.tasks:[];
         var roomsToSave=prop.rooms&&prop.rooms.length>0?prop.rooms:[];
         var inventoryToSave=prop.inventory&&prop.inventory.length>0?prop.inventory:[];
-        console.log("🔄 DB was empty, saving local data to Supabase:",prop.id,
-          "tasks:",tasksToSave.length,"rooms:",roomsToSave.length,"inventory:",inventoryToSave.length);
+        // Show saving indicator
+        var toast=document.createElement("div");
+        toast.style.cssText="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1A1A1A;border:1px solid #333;color:#888;font-size:11px;padding:8px 16px;border-radius:20px;z-index:9999;";
+        toast.textContent="💾 Saving property data...";
+        document.body.appendChild(toast);
         updateProperty(prop.id,{
           tasks:tasksToSave,
           rooms:roomsToSave,
@@ -1677,9 +1680,17 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
           linenBags:prop.linenBags||0,
           schedule:prop.schedule||[],
         }).then(function(){
-          console.log("✅ Recovery save succeeded for",prop.id);
+          toast.style.background="#052e16";
+          toast.style.borderColor="#22C55E";
+          toast.style.color="#22C55E";
+          toast.textContent="✅ Property data saved!";
+          setTimeout(function(){try{document.body.removeChild(toast);}catch(e){}},3000);
         }).catch(function(e){
-          console.error("❌ Recovery save FAILED:",e.message,e.code);
+          toast.style.background="#2d0000";
+          toast.style.borderColor="#EF4444";
+          toast.style.color="#EF4444";
+          toast.textContent="❌ Save failed: "+e.message;
+          setTimeout(function(){try{document.body.removeChild(toast);}catch(e){}},8000);
         });
       }
     }).catch(function(e){
@@ -3018,6 +3029,10 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
             return p;
           });});
           // EXPLICITLY save tasks/rooms/inventory to DB (don't rely on auto-sync)
+          var saveToast=document.createElement("div");
+          saveToast.style.cssText="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1A1A1A;border:1px solid #333;color:#888;font-size:11px;padding:8px 16px;border-radius:20px;z-index:9999;";
+          saveToast.textContent="💾 Saving to database...";
+          document.body.appendChild(saveToast);
           try{
             await updateProperty(dbProp.id,{
               tasks:localProp.tasks||[],
@@ -3029,9 +3044,13 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
               cleanerNotes:"",
               linenBags:0,
             });
-            console.log("✅ Property content saved to Supabase:",dbProp.id);
+            saveToast.style.background="#052e16";saveToast.style.borderColor="#22C55E";saveToast.style.color="#22C55E";
+            saveToast.textContent="✅ Property saved to database!";
+            setTimeout(function(){try{document.body.removeChild(saveToast);}catch(e){}},3000);
           }catch(saveErr){
-            console.error("❌ Failed to save property content:",saveErr.message);
+            saveToast.style.background="#2d0000";saveToast.style.borderColor="#EF4444";saveToast.style.color="#EF4444";
+            saveToast.textContent="❌ DB save failed: "+saveErr.message;
+            setTimeout(function(){try{document.body.removeChild(saveToast);}catch(e){}},8000);
           }
           // Upload cover photo to Storage if it's base64
           if(form.photo&&form.photo.startsWith("data:image")){
