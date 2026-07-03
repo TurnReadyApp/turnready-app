@@ -1625,7 +1625,7 @@ function downloadMedia(url, filename){
   }
 }
 
-function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotification,templates,user,saveContent}){
+function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotification,templates,user}){
   const [activeRoom,setActiveRoom]=useState(null);
   const [activeTab,setActiveTab]=useState("tasks");
   const [editingInvId,setEditingInvId]=useState(null);
@@ -1869,7 +1869,6 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                   <button key={tmpl.id} onClick={function(){
                     var newTasks=tmpl.tasks.map(function(t,i){return {id:"t"+(Date.now()+i),section:t.section,label:t.label,done:false};});
                     setProps(function(ps){return ps.map(function(pp){return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:newTasks});});});
-                    if(saveContent)saveContent(prop.id,{tasks:newTasks,rooms:prop.rooms||[],inventory:prop.inventory||[],schedule:prop.schedule||[],cleanerPhotos:prop.cleanerPhotos||[],linenBagPhotos:prop.linenBagPhotos||[],cleanerNotes:prop.cleanerNotes||"",linenBags:prop.linenBags||0});
                     setShowTmplPicker(false);
                   }} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,border:"1px solid #2A2A2A",background:"#141414",cursor:"pointer",textAlign:"left",width:"100%",boxSizing:"border-box",overflow:"hidden"}}>
                     <span style={{fontSize:20,flexShrink:0}}>{tmpl.icon}</span>
@@ -3057,7 +3056,7 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
         </div>
       );
     }
-    return <ErrorBoundary><PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners} user={user} saveContent={savePropertyContent}/></ErrorBoundary>;
+    return <ErrorBoundary><PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners} user={user}/></ErrorBoundary>;
   }
 
   return(
@@ -9983,29 +9982,6 @@ export default function App() {
     </div></div>
   );
 
-
-  // Save property JSONB content (tasks, rooms, inventory) explicitly
-  // Called when content changes inside PropDetail
-  async function savePropertyContent(propId, updates){
-    if(!propId||!propId.includes("-"))return; // Only real Supabase props
-    var isReal=false;
-    try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
-    if(!isReal)return;
-    try{
-      await updateProperty(propId,{
-        tasks:updates.tasks,
-        rooms:updates.rooms,
-        inventory:updates.inventory,
-        cleanerPhotos:updates.cleanerPhotos,
-        linenBagPhotos:updates.linenBagPhotos,
-        cleanerNotes:updates.cleanerNotes,
-        schedule:updates.schedule,
-        linenBags:updates.linenBags,
-      });
-    }catch(e){
-      console.error("savePropertyContent failed:",e.message);
-    }
-  }
 
   function renderView(){
     if(!user)return null;
