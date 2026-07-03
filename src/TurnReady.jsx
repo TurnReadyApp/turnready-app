@@ -1707,7 +1707,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                   // Remove from local state immediately
                   setProps(function(ps){return ps.filter(function(p){return p.id!==prop.id;});});
                   // Delete from Supabase if real property (UUID-style id)
-                  if(prop.id&&prop.id.length>20){
+                  if(prop.id&&prop.id.includes("-")){
                     await deleteProperty(prop.id);
                   }
                   setDeleting(false);
@@ -1907,7 +1907,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     setDragTaskId(null);setDragOverTaskId(null);
                   }}
                   onDragEnd={function(){setDragTaskId(null);setDragOverTaskId(null);}}
-                  style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 0",
+                  style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 0",overflow:"hidden",
                     borderBottom:"1px solid #1A1A1A",
                     background:dragOverTaskId===t.id?"rgba(204,0,0,.12)":"transparent",
                     borderRadius:dragOverTaskId===t.id?6:0,
@@ -2087,12 +2087,40 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
                       📷 Camera
                       <input type="file" accept="image/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){compressImage(ev.target.result,1200,1200,0.75,function(compressed){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([compressed])});})});});});});};reader.readAsDataURL(file);});}}/>
+                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){
+                        var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(ex){}
+                        compressImage(ev.target.result,1200,1200,0.75,function(compressed){
+                          if(isReal&&prop.id&&prop.id.includes("-")){
+                            // Upload to Supabase Storage
+                            uploadImageToStorage("property-media","rooms/"+prop.id+"/"+r.id+"/ref-"+Date.now()+".jpg",compressed).then(function(url){
+                              setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([url])});})});});});
+                            }).catch(function(){
+                              setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([compressed])});})});});});
+                            });
+                          } else {
+                            setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([compressed])});})});});});
+                          }
+                        });
+                      };reader.readAsDataURL(file);});}}/>
                     </label>
                     <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
                       📸 Gallery
                       <input type="file" accept="image/*" multiple style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){compressImage(ev.target.result,1200,1200,0.75,function(compressed){setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([compressed])});})});});});});};reader.readAsDataURL(file);});}}/>
+                        onChange={function(e){var files=Array.from(e.target.files);files.forEach(function(file){var reader=new FileReader();reader.onload=function(ev){
+                        var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(ex){}
+                        compressImage(ev.target.result,1200,1200,0.75,function(compressed){
+                          if(isReal&&prop.id&&prop.id.includes("-")){
+                            // Upload to Supabase Storage
+                            uploadImageToStorage("property-media","rooms/"+prop.id+"/"+r.id+"/ref-"+Date.now()+".jpg",compressed).then(function(url){
+                              setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([url])});})});});});
+                            }).catch(function(){
+                              setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([compressed])});})});});});
+                            });
+                          } else {
+                            setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){if(rm.id!==r.id)return rm;return Object.assign({},rm,{refPhotos:(rm.refPhotos||[]).concat([compressed])});})});});});
+                          }
+                        });
+                      };reader.readAsDataURL(file);});}}/>
                     </label>
                     {!r.refVideo&&(
                       <label style={{flex:1,minWidth:80,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #333",borderRadius:8,padding:"7px",cursor:"pointer",fontSize:10,color:"#555"}}>
@@ -2486,12 +2514,38 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                 <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #444",borderRadius:6,padding:"7px",cursor:"pointer",fontSize:10,color:"#888",fontWeight:700}}>
                   📷 Take Photo
                   <input type="file" accept="image/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                    onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){compressImage(ev.target.result,1200,800,0.8,function(compressed){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});});};r.readAsDataURL(f);}}/>
+                    onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){
+                  var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(ex){}
+                  compressImage(ev.target.result,1200,800,0.8,function(compressed){
+                    if(isReal&&prop.id&&prop.id.includes("-")){
+                      uploadImageToStorage("property-media","properties/"+prop.id+"/cover-"+Date.now()+".jpg",compressed).then(function(url){
+                        setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:url});});});
+                      }).catch(function(){
+                        setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
+                      });
+                    } else {
+                      setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
+                    }
+                  });
+                };r.readAsDataURL(f);}}/>
                 </label>
                 <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,background:"transparent",border:"1px dashed #444",borderRadius:6,padding:"7px",cursor:"pointer",fontSize:10,color:"#888",fontWeight:700}}>
                   📁 Upload Photo
                   <input type="file" accept="image/*" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}}
-                    onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){compressImage(ev.target.result,1200,800,0.8,function(compressed){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});});};r.readAsDataURL(f);}}/>
+                    onChange={function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){
+                  var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(ex){}
+                  compressImage(ev.target.result,1200,800,0.8,function(compressed){
+                    if(isReal&&prop.id&&prop.id.includes("-")){
+                      uploadImageToStorage("property-media","properties/"+prop.id+"/cover-"+Date.now()+".jpg",compressed).then(function(url){
+                        setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:url});});});
+                      }).catch(function(){
+                        setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
+                      });
+                    } else {
+                      setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
+                    }
+                  });
+                };r.readAsDataURL(f);}}/>
                 </label>
               </div>
             )}
@@ -5442,15 +5496,15 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
         return j.id!==existingRejected.id?j:Object.assign({},newJob,{id:existingRejected.id});
       });});
       // Update in Supabase if real job
-      if(existingRejected.id&&existingRejected.id.length>10&&existingRejected.id[0]!=="j"){
+      if(existingRejected.id&&existingRejected.id.includes("-")){
         updateJob(existingRejected.id,{status:"pending_approval",tasks:newJob.tasks,inventory:newJob.inventory,completed_at:newJob.completedAt,cleaner_notes:newJob.cleanerNotes,duration_seconds:newJob.duration}).catch(function(e){console.error("Job update failed:",e.message);});
       }
     } else {
       setJobs(function(js){return js.concat([newJob]);});
       // Save to Supabase
-      if(user&&user.id&&user.id.length>10){
+      if(user&&user.id&&user.id.includes("-")){
         var dbJob={
-          property_id:prop.id&&prop.id.length>20?prop.id:null,
+          property_id:prop.id&&prop.id.includes("-")?prop.id:null,
           property_name:prop.name,
           cleaner_id:user.id,
           status:"pending_approval",
@@ -6389,7 +6443,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                       <div key={sec} style={{marginBottom:10}}>
                         <div style={{fontSize:10,color:C.red,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>{sec}</div>
                         {secTasks.map(function(t){return(
-                          <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #1A1A1A"}}>
+                          <div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"5px 0",overflow:"hidden",borderBottom:"1px solid #1A1A1A"}}>
                             <span style={{fontSize:14,color:t.done?"#22C55E":"#444"}}>{t.done?"✓":"○"}</span>
                             <span style={{fontSize:12,color:t.done?C.offWhite:"#555",textDecoration:"none",flex:1,wordBreak:"break-word",overflowWrap:"break-word",minWidth:0}}>{t.label}</span>
                           </div>
@@ -6730,7 +6784,7 @@ function Messages({user,cleaners,addNotification}){
 
   // Load messages from Supabase when contact is selected
   useEffect(function(){
-    if(!selCleaner||!user||!user.id||user.id.length<10)return;
+    if(!selCleaner||!user||!user.id||!user.id.includes("-"))return;
     if(msgsLoaded[selCleaner.id]||!selCleaner.id||selCleaner.id.length<10)return;
     getMessages(user.id,selCleaner.id).then(function(dbMsgs){
       if(dbMsgs&&dbMsgs.length>0){
@@ -6763,7 +6817,7 @@ function Messages({user,cleaners,addNotification}){
       time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})};
     setInput(""); setMediaPreview(null);
     // Save to Supabase if real users
-    if(user&&user.id&&user.id.length>10&&selCleaner&&selCleaner.id&&selCleaner.id.length>10){
+    if(user&&user.id&&user.id.includes("-")&&selCleaner&&selCleaner.id&&selCleaner.id.includes("-")){
       var toId=isManager?selCleaner.id:selCleaner.id; // manager sends to cleaner, cleaner sends to manager
       sendMessage({
         from_id:user.id,
@@ -7527,7 +7581,7 @@ function ProfilePage({user,setUser,cleaners,setCleaners,jobs,setShowMgrStripe}){
       }catch(e){}
     }
     // Save to Supabase if real user
-    if(user&&user.id&&user.id.length>10){
+    if(user&&user.id&&user.id.includes("-")){
       var dbUpdates={
         name:updated.name,
         phone:updated.phone||null,
@@ -9255,7 +9309,7 @@ export default function App() {
     propsSyncTimer.current=setTimeout(function(){
       props.forEach(function(p){
         // Only sync props that have a UUID-style id (real Supabase props, not demo p1/p2/p3)
-        if(!p.id||p.id.length<20)return; // Skip demo props (they have short ids like "p1")
+        if(!p.id||!p.id.includes("-"))return; // Only sync real Supabase UUIDs (contain dashes like "abc-def-...")
         // Strip large base64 videos from rooms before syncing (keep photos only, compress separately)
         var roomsForSync=(p.rooms||[]).map(function(r){
           return Object.assign({},r,{
@@ -9304,7 +9358,7 @@ export default function App() {
           console.error("❌ Supabase sync failed for property",p.id,"Error:",e.message,"Code:",e.code);
         });
       });
-    },2000);
+    },800);
   },[props]);
 
   // Persist manager-specific data when they make changes
@@ -9907,7 +9961,7 @@ export default function App() {
           case "Dashboard": return <Dashboard props={props} cleaners={cleaners} jobs={jobs} setView={setView} notifications={notifications} onSelectCleaner={(c)=>{setSelectedCleaner(c);setView("Team");}}/>;
           case "Properties": return <Properties props={props} setProps={setProps} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){
               setNotifications(function(prev){return prev.concat([n]);});
-              if(user&&user.id&&user.id.length>10){
+              if(user&&user.id&&user.id.includes("-")){
                 createNotification({
                   user_id:n.forCleaner||n.userId||user.id,
                   type:n.type||"info",
@@ -9923,7 +9977,7 @@ export default function App() {
           case "Team": return <Cleaners cleaners={cleaners} setCleaners={setCleaners} jobs={jobs} pendingCleaners={pendingCleaners} setPendingCleaners={setPendingCleaners} allProps={props} setProps={setProps} user={user} availability={availability} initialSelected={selectedCleaner} onClearSelected={()=>setSelectedCleaner(null)}/>;
           case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={function(n){
               setNotifications(function(prev){return prev.concat([n]);});
-              if(user&&user.id&&user.id.length>10){
+              if(user&&user.id&&user.id.includes("-")){
                 createNotification({
                   user_id:n.forCleaner||n.userId||user.id,
                   type:n.type||"info",
@@ -9950,7 +10004,7 @@ export default function App() {
           case "Home": return <CleanerDashboard user={user} cleaners={cleaners} jobs={jobs} props={props} setView={setView}/>;
           case "My Jobs": return <CleanerJobs user={user} props={props} setProps={setProps} jobs={jobs} setJobs={setJobs} cleaners={cleaners} pendingRemovals={pendingRemovals} setPendingRemovals={setPendingRemovals} addNotification={function(n){
               setNotifications(function(prev){return prev.concat([n]);});
-              if(user&&user.id&&user.id.length>10){
+              if(user&&user.id&&user.id.includes("-")){
                 createNotification({
                   user_id:n.forCleaner||n.userId||user.id,
                   type:n.type||"info",
@@ -9968,7 +10022,7 @@ export default function App() {
           case "My Availability": return <CleanerAvailability user={user} availability={availability} setAvailability={setAvailability}/>;
           case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={function(n){
               setNotifications(function(prev){return prev.concat([n]);});
-              if(user&&user.id&&user.id.length>10){
+              if(user&&user.id&&user.id.includes("-")){
                 createNotification({
                   user_id:n.forCleaner||n.userId||user.id,
                   type:n.type||"info",
