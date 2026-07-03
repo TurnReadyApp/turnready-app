@@ -133,13 +133,14 @@ export async function getTeamCleaners(managerId) {
 // ── PROPERTIES ────────────────────────────────────────────────────────────────
 
 export async function getProperties(managerId) {
+  // Load ONLY metadata first - no JSONB blobs (videos/photos make rows huge)
   const { data, error } = await supabase
     .from('properties')
-    .select('id,manager_id,name,address,type,pay,bedrooms,bathrooms,photo,notes,check_in,check_out,same_day,access_code,supply_info,alarm_code,linen_rate,total_beds,linen_bags,assigned_to,guest_rating,created_at,tasks_data,rooms_data,inventory_data,schedule,cleaner_photos,linen_bag_photos,cleaner_notes')
+    .select('id,manager_id,name,address,type,pay,bedrooms,bathrooms,photo,notes,check_in,check_out,same_day,access_code,supply_info,alarm_code,linen_rate,total_beds,linen_bags,assigned_to,guest_rating,created_at,schedule')
     .eq('manager_id', managerId)
     .order('created_at', { ascending: true })
   if (error) throw error
-  // Map JSONB columns back to app field names
+  // Map columns back to app field names - tasks/rooms/inventory load lazily
   return (data || []).map(p => ({
     ...p,
     tasks: p.tasks_data || [],
@@ -199,6 +200,26 @@ export async function createProperty(property) {
     .single()
   if (error) throw error
   return data
+}
+
+
+export async function getPropertyFull(propertyId) {
+  // Load full property data including JSONB blobs (for when user opens a property)
+  const { data, error } = await supabase
+    .from('properties')
+    .select('id,tasks_data,rooms_data,inventory_data,cleaner_photos,linen_bag_photos,cleaner_notes')
+    .eq('id', propertyId)
+    .single()
+  if (error) throw error
+  return {
+    id: data.id,
+    tasks: data.tasks_data || [],
+    rooms: data.rooms_data || [],
+    inventory: data.inventory_data || [],
+    cleanerPhotos: data.cleaner_photos || [],
+    linenBagPhotos: data.linen_bag_photos || [],
+    cleanerNotes: data.cleaner_notes || '',
+  }
 }
 
 export async function updateProperty(id, updates) {
