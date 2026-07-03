@@ -1643,10 +1643,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
   useEffect(function(){
     if(!prop||!prop.id||!prop.id.includes("-"))return; // Skip demo props
     if(fullLoaded)return;
-    // Check if already has data
-    if((prop.tasks&&prop.tasks.length>0)||(prop.rooms&&prop.rooms.length>0)||(prop.inventory&&prop.inventory.length>0)){
-      setFullLoaded(true);return;
-    }
+    // Always load from DB when property is opened (local data may be stale)
     getPropertyFull(prop.id).then(function(full){
       if(!full)return;
       setProps(function(ps){return ps.map(function(p){
@@ -1661,6 +1658,15 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
         });
       });});
       setFullLoaded(true);
+      // If DB returned empty tasks/rooms/inventory but local state has data,
+      // save local state to DB now (handles case where initial save was lost)
+      if(full&&(!full.tasks||full.tasks.length===0)&&(prop.tasks&&prop.tasks.length>0)){
+        updateProperty(prop.id,{
+          tasks:prop.tasks,
+          rooms:prop.rooms||[],
+          inventory:prop.inventory||[],
+        }).catch(function(e){console.error("Recovery save:",e.message);});
+      }
     }).catch(function(e){
       console.error("Lazy load failed:",e.message);
       setFullLoaded(true); // Don't retry on error
@@ -2158,7 +2164,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                           onChange={function(e){
                             var file=e.target.files[0];if(!file)return;
                             var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(ex){}
-                            if(isReal&&prop.id&&prop.id.length>20){
+                            if(isReal&&prop.id&&prop.id.includes("-")){
                               var ov=URL.createObjectURL(file);
                               setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ov,refVideoUploading:true});})});});});
                               var rd=new FileReader();rd.onload=function(ev2){
@@ -2181,7 +2187,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                           onChange={function(e){
                             var file=e.target.files[0];if(!file)return;
                             var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(ex){}
-                            if(isReal&&prop.id&&prop.id.length>20){
+                            if(isReal&&prop.id&&prop.id.includes("-")){
                               var ov=URL.createObjectURL(file);
                               setProps(function(ps){return ps.map(function(p){if(p.id!==prop.id)return p;return Object.assign({},p,{rooms:(p.rooms||[]).map(function(rm){return rm.id!==r.id?rm:Object.assign({},rm,{refVideo:ov,refVideoUploading:true});})});});});
                               var rd=new FileReader();rd.onload=function(ev2){
@@ -2962,7 +2968,7 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
     setForm({name:"",address:"",type:"Airbnb",pay:"",bedrooms:"",bathrooms:"",description:"",photo:""});
     setShowAdd(false);
     // Save to Supabase in background
-    if(user&&user.id&&user.id!=="mgr1"){
+    if(user&&user.id&&user.id.includes("-")){
       try{
         var dbProp=await createProperty({
           manager_id:user.id,
@@ -2972,7 +2978,8 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
           pay:Number(form.pay),
           bedrooms:Number(form.bedrooms)||1,
           bathrooms:Number(form.bathrooms)||1,
-          photo:form.photo||null,
+          // Only save https:// URLs to DB, not base64
+          photo:(form.photo&&form.photo.startsWith("http"))?form.photo:null,
           notes:"",
           checkIn:"4:00 PM",
           checkOut:"11:00 AM",
@@ -2995,6 +3002,15 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
             if(p.id===newId)return Object.assign({},p,{id:dbProp.id});
             return p;
           });});
+          // Upload cover photo to Storage if it's base64
+          if(form.photo&&form.photo.startsWith("data:image")){
+            compressImage(form.photo,1200,800,0.8,function(compressed){
+              uploadImageToStorage("property-media","properties/"+dbProp.id+"/cover-"+Date.now()+".jpg",compressed).then(function(url){
+                setProps(function(ps){return ps.map(function(p){return p.id!==dbProp.id?p:Object.assign({},p,{photo:url});});});
+                updateProperty(dbProp.id,{photo:url}).catch(function(e){console.error("Cover photo save:",e.message);});
+              }).catch(function(e){console.error("Cover photo upload:",e.message);});
+            });
+          }
         }
       }catch(e){
         console.error("Supabase save failed:",e.message);
@@ -4215,7 +4231,7 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
     setManagerRating(0);
     setManagerComment("");
     // Persist to Supabase if real job
-    if(job.dbId||( job.id&&job.id.length>10&&job.id[0]!=="j")){
+    if(job.dbId||(job.id&&job.id.includes("-"))){
       var realJobId=job.dbId||job.id;
       updateJob(realJobId,{status:"approved",paid_at:new Date().toISOString()}).catch(function(e){console.error("Approve save failed:",e.message);});
     }
@@ -5439,8 +5455,8 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
     var isReal=false;
     try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
     
-    // For real users with real property IDs, upload to Supabase Storage
-    if(isReal && propId && propId.length > 20){
+    // For real users with real property IDs (Supabase UUIDs contain dashes)
+    if(isReal && propId && propId.includes("-")){
       // Show preview immediately using object URL
       var objectUrl=URL.createObjectURL(file);
       setProps(function(ps){return ps.map(function(p){
@@ -6823,7 +6839,7 @@ function Messages({user,cleaners,addNotification}){
   // Load messages from Supabase when contact is selected
   useEffect(function(){
     if(!selCleaner||!user||!user.id||!user.id.includes("-"))return;
-    if(msgsLoaded[selCleaner.id]||!selCleaner.id||selCleaner.id.length<10)return;
+    if(msgsLoaded[selCleaner.id]||!selCleaner.id||!selCleaner.id.includes("-"))return;
     getMessages(user.id,selCleaner.id).then(function(dbMsgs){
       if(dbMsgs&&dbMsgs.length>0){
         var mapped=dbMsgs.map(function(m){
@@ -9361,8 +9377,8 @@ export default function App() {
           pay:p.pay,
           bedrooms:p.bedrooms,
           bathrooms:p.bathrooms,
-          // Cover photo: only sync if it's a Storage URL (not base64)
-          photo:p.photo&&p.photo.startsWith("http")?p.photo:undefined,
+          // Cover photo: sync Storage URLs; skip base64 (too large) and undefined
+          photo:p.photo?(p.photo.startsWith("http")?p.photo:undefined):undefined,
           notes:p.notes,
           checkIn:p.checkIn||p.check_in,
           checkOut:p.checkOut||p.check_out,
@@ -9952,7 +9968,7 @@ export default function App() {
           setShowMgrStripe(false);
           setView("Dashboard");
           // Save to Supabase
-          if(user&&user.id&&user.id!=="mgr1"){
+          if(user&&user.id&&user.id.includes("-")){
             try{
               var {updateUserProfile}=await import("./lib/supabase.js");
               await updateUserProfile(user.id,{stripe_business_status:"connected",stripe_business_account:acct});
