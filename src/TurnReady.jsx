@@ -1644,7 +1644,19 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
     if(!prop||!prop.id||!prop.id.includes("-"))return; // Skip demo props
     if(fullLoaded)return;
     // Always load from DB when property is opened (local data may be stale)
+    var loadToast=document.createElement("div");
+    loadToast.id="load-toast-"+prop.id;
+    loadToast.style.cssText="position:fixed;top:60px;right:12px;background:#1A1A1A;border:1px solid #333;color:#888;font-size:10px;padding:6px 12px;border-radius:12px;z-index:9999;max-width:200px;";
+    loadToast.textContent="Loading from DB...";
+    document.body.appendChild(loadToast);
     getPropertyFull(prop.id).then(function(full){
+      var existing=document.getElementById("load-toast-"+prop.id);
+      if(existing){
+        existing.textContent=full?"✅ DB: "+( full.tasks?full.tasks.length:0)+"t "+(full.rooms?full.rooms.length:0)+"r "+(full.inventory?full.inventory.length:0)+"i":"⚠️ DB returned null";
+        existing.style.borderColor=full&&full.tasks&&full.tasks.length>0?"#22C55E":"#F59E0B";
+        existing.style.color=full&&full.tasks&&full.tasks.length>0?"#22C55E":"#F59E0B";
+        setTimeout(function(){try{document.body.removeChild(existing);}catch(e){}},4000);
+      }
       if(!full)return;
       setProps(function(ps){return ps.map(function(p){
         if(p.id!==prop.id)return p;
@@ -1694,7 +1706,13 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
         });
       }
     }).catch(function(e){
-      console.error("Lazy load failed:",e.message);
+      var existing=document.getElementById("load-toast-"+prop.id);
+      if(existing){
+        existing.textContent="❌ Load failed: "+e.message;
+        existing.style.borderColor="#EF4444";
+        existing.style.color="#EF4444";
+        setTimeout(function(){try{document.body.removeChild(existing);}catch(e){}},8000);
+      }
       setFullLoaded(true); // Don't retry on error
     });
   },[prop&&prop.id]);
