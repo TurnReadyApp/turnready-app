@@ -3048,6 +3048,15 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
 
   if(sel){
     var prop=props.find(p=>p.id===sel);
+    if(!prop){
+      // Property not found yet (still loading from Supabase) - show spinner
+      return(
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:200,gap:12}}>
+          <div style={{width:24,height:24,border:"3px solid #333",borderTopColor:"#CC0000",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+          <div style={{fontSize:12,color:"#888"}}>Loading property...</div>
+        </div>
+      );
+    }
     return <ErrorBoundary><PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners} user={user} saveContent={savePropertyContent}/></ErrorBoundary>;
   }
 
