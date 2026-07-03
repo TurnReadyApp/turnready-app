@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { supabase, signIn, signUp, signOut, getCurrentUser, updateUserProfile, getTeamCleaners, getProperties, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications, uploadVideoToStorage, uploadImageToStorage, isStorageUrl } from "./lib/supabase.js";
+import { supabase, signIn, signUp, signOut, getCurrentUser, updateUserProfile, getTeamCleaners, getProperties, getPropertyFull, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications, uploadVideoToStorage, uploadImageToStorage, isStorageUrl } from "./lib/supabase.js";
 
 
 
@@ -1625,7 +1625,7 @@ function downloadMedia(url, filename){
   }
 }
 
-function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotification,templates,user}){
+function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotification,templates,user,saveContent}){
   const [activeRoom,setActiveRoom]=useState(null);
   const [activeTab,setActiveTab]=useState("tasks");
   const [editingInvId,setEditingInvId]=useState(null);
@@ -1637,6 +1637,35 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
   const [galleryIdx,setGalleryIdx]=useState(0);
   const [showDeleteConfirm,setShowDeleteConfirm]=useState(false);
   const [deleting,setDeleting]=useState(false);
+  const [fullLoaded,setFullLoaded]=useState(false);
+
+  // Lazy-load full property data (tasks, rooms, inventory) when property is opened
+  useEffect(function(){
+    if(!prop||!prop.id||!prop.id.includes("-"))return; // Skip demo props
+    if(fullLoaded)return;
+    // Check if already has data
+    if((prop.tasks&&prop.tasks.length>0)||(prop.rooms&&prop.rooms.length>0)||(prop.inventory&&prop.inventory.length>0)){
+      setFullLoaded(true);return;
+    }
+    getPropertyFull(prop.id).then(function(full){
+      if(!full)return;
+      setProps(function(ps){return ps.map(function(p){
+        if(p.id!==prop.id)return p;
+        return Object.assign({},p,{
+          tasks:full.tasks&&full.tasks.length>0?full.tasks:p.tasks||[],
+          rooms:full.rooms&&full.rooms.length>0?full.rooms:p.rooms||[],
+          inventory:full.inventory&&full.inventory.length>0?full.inventory:p.inventory||[],
+          cleanerPhotos:full.cleanerPhotos||p.cleanerPhotos||[],
+          linenBagPhotos:full.linenBagPhotos||p.linenBagPhotos||[],
+          cleanerNotes:full.cleanerNotes||p.cleanerNotes||"",
+        });
+      });});
+      setFullLoaded(true);
+    }).catch(function(e){
+      console.error("Lazy load failed:",e.message);
+      setFullLoaded(true); // Don't retry on error
+    });
+  },[prop&&prop.id]);
   const [showTmplPicker,setShowTmplPicker]=useState(false);
   const [newSecName,setNewSecName]=useState("");
   const [showNewSec,setShowNewSec]=useState(false);
@@ -1840,6 +1869,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                   <button key={tmpl.id} onClick={function(){
                     var newTasks=tmpl.tasks.map(function(t,i){return {id:"t"+(Date.now()+i),section:t.section,label:t.label,done:false};});
                     setProps(function(ps){return ps.map(function(pp){return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:newTasks});});});
+                    if(saveContent)saveContent(prop.id,{tasks:newTasks,rooms:prop.rooms||[],inventory:prop.inventory||[],schedule:prop.schedule||[],cleanerPhotos:prop.cleanerPhotos||[],linenBagPhotos:prop.linenBagPhotos||[],cleanerNotes:prop.cleanerNotes||"",linenBags:prop.linenBags||0});
                     setShowTmplPicker(false);
                   }} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,border:"1px solid #2A2A2A",background:"#141414",cursor:"pointer",textAlign:"left",width:"100%",boxSizing:"border-box",overflow:"hidden"}}>
                     <span style={{fontSize:20,flexShrink:0}}>{tmpl.icon}</span>
@@ -3018,7 +3048,7 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
 
   if(sel){
     var prop=props.find(p=>p.id===sel);
-    return <ErrorBoundary><PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners} user={user}/></ErrorBoundary>;
+    return <ErrorBoundary><PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners} user={user} saveContent={savePropertyContent}/></ErrorBoundary>;
   }
 
   return(
@@ -9325,13 +9355,15 @@ export default function App() {
           });
         });
         updateProperty(p.id,{
+          // Metadata only in auto-sync (fast, no large base64 payloads)
           name:p.name,
           address:p.address,
           type:p.type,
           pay:p.pay,
           bedrooms:p.bedrooms,
           bathrooms:p.bathrooms,
-          photo:p.photo,
+          // Cover photo: only sync if it's a Storage URL (not base64)
+          photo:p.photo&&p.photo.startsWith("http")?p.photo:undefined,
           notes:p.notes,
           checkIn:p.checkIn||p.check_in,
           checkOut:p.checkOut||p.check_out,
@@ -9341,16 +9373,17 @@ export default function App() {
           alarmCode:p.alarmCode||p.alarm_code,
           linenRate:p.linenRate||p.linen_rate,
           totalBeds:p.totalBeds||p.total_beds,
-          tasks:p.tasks,
-          rooms:roomsForSync,
-          inventory:p.inventory,
-          schedule:p.schedule,
-          cleanerPhotos:p.cleanerPhotos,
-          linenBagPhotos:p.linenBagPhotos,
-          cleanerNotes:p.cleanerNotes,
+          schedule:p.schedule, // Schedule is small - always sync
           linenBags:p.linenBags,
           assignedTo:p.assignedTo,
           guest_rating:p.guestRating,
+          // JSONB blobs (tasks/rooms/inventory) - sync only if they have Storage URLs (not base64)
+          tasks:p.tasks,
+          rooms:roomsForSync, // roomsForSync already strips large base64 videos
+          inventory:p.inventory,
+          cleanerPhotos:(p.cleanerPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
+          linenBagPhotos:(p.linenBagPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
+          cleanerNotes:p.cleanerNotes,
         }).then(function(){
           // Update cache after successful sync - use user.id from closure
           try{localStorage.setItem("tr_props_"+(user&&user.id?user.id:""),JSON.stringify(props));}catch(e){}
@@ -9953,6 +9986,30 @@ export default function App() {
       <button className="btn ghost" onClick={()=>setUser(null)}>Back to Login</button>
     </div></div>
   );
+
+
+  // Save property JSONB content (tasks, rooms, inventory) explicitly
+  // Called when content changes inside PropDetail
+  async function savePropertyContent(propId, updates){
+    if(!propId||!propId.includes("-"))return; // Only real Supabase props
+    var isReal=false;
+    try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
+    if(!isReal)return;
+    try{
+      await updateProperty(propId,{
+        tasks:updates.tasks,
+        rooms:updates.rooms,
+        inventory:updates.inventory,
+        cleanerPhotos:updates.cleanerPhotos,
+        linenBagPhotos:updates.linenBagPhotos,
+        cleanerNotes:updates.cleanerNotes,
+        schedule:updates.schedule,
+        linenBags:updates.linenBags,
+      });
+    }catch(e){
+      console.error("savePropertyContent failed:",e.message);
+    }
+  }
 
   function renderView(){
     if(!user)return null;
