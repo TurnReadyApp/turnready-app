@@ -9096,17 +9096,16 @@ export default function App() {
 
   // Restore session on app load
   useEffect(function(){
-    // Pre-load props cache before auth check to eliminate delay
+    // Clear old large localStorage caches that could freeze the browser
     try{
-      var preFlag=localStorage.getItem("turnready_is_real_user");
-      var preSession=localStorage.getItem("turnready_session_user");
-      if(preFlag==="true"&&preSession){
-        var preUser=JSON.parse(preSession);
-        if(preUser&&preUser.id){
-          var preCache=localStorage.getItem("tr_props_"+preUser.id);
-          if(preCache){var preCp=JSON.parse(preCache);if(preCp&&preCp.length)setProps(preCp);}
+      var allKeys=Object.keys(localStorage);
+      allKeys.forEach(function(k){
+        if(k.startsWith("tr_props_")||k.startsWith("turnready_shared_props")||k.startsWith("turnready_mgr_")){
+          // Only clear if it contains base64 video data (large)
+          var val=localStorage.getItem(k);
+          if(val&&val.length>500000){localStorage.removeItem(k);}
         }
-      }
+      });
     }catch(e){}
     getCurrentUser().then(function(profile){
       if(profile){
@@ -9193,7 +9192,6 @@ export default function App() {
                 });
               });
               setProps(mapped);
-              try{localStorage.setItem("tr_props_"+profile.id,JSON.stringify(mapped));}catch(e){}
             } else {
               try{
                 var stored=localStorage.getItem("turnready_shared_props");
@@ -9271,16 +9269,9 @@ export default function App() {
     try{
       var flag=localStorage.getItem("turnready_is_real_user");
       if(flag==="true"){
-        // Real user - try to load from cache first for instant display
-        var sessionUser=localStorage.getItem("turnready_session_user");
-        if(sessionUser){
-          var su=JSON.parse(sessionUser);
-          if(su&&su.id){
-            var cached=localStorage.getItem("tr_props_"+su.id);
-            if(cached){var cp=JSON.parse(cached);if(cp&&cp.length)return cp;}
-          }
-        }
-        return []; // No cache yet - start empty, load from Supabase
+        // Real user - always start empty, load fresh from Supabase
+        // (cache disabled - old cache had huge base64 videos that froze the browser)
+        return [];
       }
       var stored=localStorage.getItem("turnready_shared_props");
       if(stored){var sp=JSON.parse(stored);if(sp&&sp.length)return sp;}
@@ -9384,9 +9375,6 @@ export default function App() {
           cleanerPhotos:(p.cleanerPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
           linenBagPhotos:(p.linenBagPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
           cleanerNotes:p.cleanerNotes,
-        }).then(function(){
-          // Update cache after successful sync - use user.id from closure
-          try{localStorage.setItem("tr_props_"+(user&&user.id?user.id:""),JSON.stringify(props));}catch(e){}
         }).catch(function(e){
           console.error("❌ Supabase sync failed for property",p.id,"Error:",e.message,"Code:",e.code);
         });
@@ -9675,7 +9663,6 @@ export default function App() {
                     });
                   });
                   setProps(mapped);
-                  try{localStorage.setItem("tr_props_"+u.id,JSON.stringify(mapped));}catch(e){}
                 } else {
                   // No Supabase data yet - use localStorage or demo
                   try{
