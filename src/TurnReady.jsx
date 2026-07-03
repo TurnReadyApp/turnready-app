@@ -1660,12 +1660,27 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
       setFullLoaded(true);
       // If DB returned empty tasks/rooms/inventory but local state has data,
       // save local state to DB now (handles case where initial save was lost)
-      if(full&&(!full.tasks||full.tasks.length===0)&&(prop.tasks&&prop.tasks.length>0)){
+      // Always save to DB when lazy load finds empty data (DB was empty or data was lost)
+      if(full&&(!full.tasks||full.tasks.length===0)){
+        var tasksToSave=prop.tasks&&prop.tasks.length>0?prop.tasks:[];
+        var roomsToSave=prop.rooms&&prop.rooms.length>0?prop.rooms:[];
+        var inventoryToSave=prop.inventory&&prop.inventory.length>0?prop.inventory:[];
+        console.log("🔄 DB was empty, saving local data to Supabase:",prop.id,
+          "tasks:",tasksToSave.length,"rooms:",roomsToSave.length,"inventory:",inventoryToSave.length);
         updateProperty(prop.id,{
-          tasks:prop.tasks,
-          rooms:prop.rooms||[],
-          inventory:prop.inventory||[],
-        }).catch(function(e){console.error("Recovery save:",e.message);});
+          tasks:tasksToSave,
+          rooms:roomsToSave,
+          inventory:inventoryToSave,
+          cleanerPhotos:prop.cleanerPhotos||[],
+          linenBagPhotos:prop.linenBagPhotos||[],
+          cleanerNotes:prop.cleanerNotes||"",
+          linenBags:prop.linenBags||0,
+          schedule:prop.schedule||[],
+        }).then(function(){
+          console.log("✅ Recovery save succeeded for",prop.id);
+        }).catch(function(e){
+          console.error("❌ Recovery save FAILED:",e.message,e.code);
+        });
       }
     }).catch(function(e){
       console.error("Lazy load failed:",e.message);
@@ -3002,6 +3017,22 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
             if(p.id===newId)return Object.assign({},p,{id:dbProp.id});
             return p;
           });});
+          // EXPLICITLY save tasks/rooms/inventory to DB (don't rely on auto-sync)
+          try{
+            await updateProperty(dbProp.id,{
+              tasks:localProp.tasks||[],
+              rooms:localProp.rooms||[],
+              inventory:localProp.inventory||[],
+              schedule:[],
+              cleanerPhotos:[],
+              linenBagPhotos:[],
+              cleanerNotes:"",
+              linenBags:0,
+            });
+            console.log("✅ Property content saved to Supabase:",dbProp.id);
+          }catch(saveErr){
+            console.error("❌ Failed to save property content:",saveErr.message);
+          }
           // Upload cover photo to Storage if it's base64
           if(form.photo&&form.photo.startsWith("data:image")){
             compressImage(form.photo,1200,800,0.8,function(compressed){
