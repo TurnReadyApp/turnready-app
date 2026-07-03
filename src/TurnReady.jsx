@@ -1639,83 +1639,6 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
   const [deleting,setDeleting]=useState(false);
   const [fullLoaded,setFullLoaded]=useState(false);
 
-  // Lazy-load full property data (tasks, rooms, inventory) when property is opened
-  useEffect(function(){
-    if(!prop||!prop.id||!prop.id.includes("-"))return; // Skip demo props
-    if(fullLoaded)return;
-    // Always load from DB when property is opened (local data may be stale)
-    var loadToast=document.createElement("div");
-    loadToast.id="load-toast-"+prop.id;
-    loadToast.style.cssText="position:fixed;top:60px;right:12px;background:#1A1A1A;border:1px solid #333;color:#888;font-size:10px;padding:6px 12px;border-radius:12px;z-index:9999;max-width:200px;";
-    loadToast.textContent="Loading from DB...";
-    document.body.appendChild(loadToast);
-    getPropertyFull(prop.id).then(function(full){
-      var existing=document.getElementById("load-toast-"+prop.id);
-      if(existing){
-        existing.textContent=full?"✅ DB: "+( full.tasks?full.tasks.length:0)+"t "+(full.rooms?full.rooms.length:0)+"r "+(full.inventory?full.inventory.length:0)+"i":"⚠️ DB returned null";
-        existing.style.borderColor=full&&full.tasks&&full.tasks.length>0?"#22C55E":"#F59E0B";
-        existing.style.color=full&&full.tasks&&full.tasks.length>0?"#22C55E":"#F59E0B";
-        setTimeout(function(){try{document.body.removeChild(existing);}catch(e){}},4000);
-      }
-      if(!full)return;
-      setProps(function(ps){return ps.map(function(p){
-        if(p.id!==prop.id)return p;
-        return Object.assign({},p,{
-          tasks:full.tasks&&full.tasks.length>0?full.tasks:p.tasks||[],
-          rooms:full.rooms&&full.rooms.length>0?full.rooms:p.rooms||[],
-          inventory:full.inventory&&full.inventory.length>0?full.inventory:p.inventory||[],
-          cleanerPhotos:full.cleanerPhotos||p.cleanerPhotos||[],
-          linenBagPhotos:full.linenBagPhotos||p.linenBagPhotos||[],
-          cleanerNotes:full.cleanerNotes||p.cleanerNotes||"",
-        });
-      });});
-      setFullLoaded(true);
-      // If DB returned empty tasks/rooms/inventory but local state has data,
-      // save local state to DB now (handles case where initial save was lost)
-      // Always save to DB when lazy load finds empty data (DB was empty or data was lost)
-      if(full&&(!full.tasks||full.tasks.length===0)){
-        var tasksToSave=prop.tasks&&prop.tasks.length>0?prop.tasks:[];
-        var roomsToSave=prop.rooms&&prop.rooms.length>0?prop.rooms:[];
-        var inventoryToSave=prop.inventory&&prop.inventory.length>0?prop.inventory:[];
-        // Show saving indicator
-        var toast=document.createElement("div");
-        toast.style.cssText="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1A1A1A;border:1px solid #333;color:#888;font-size:11px;padding:8px 16px;border-radius:20px;z-index:9999;";
-        toast.textContent="💾 Saving property data...";
-        document.body.appendChild(toast);
-        updateProperty(prop.id,{
-          tasks:tasksToSave,
-          rooms:roomsToSave,
-          inventory:inventoryToSave,
-          cleanerPhotos:prop.cleanerPhotos||[],
-          linenBagPhotos:prop.linenBagPhotos||[],
-          cleanerNotes:prop.cleanerNotes||"",
-          linenBags:prop.linenBags||0,
-          schedule:prop.schedule||[],
-        }).then(function(){
-          toast.style.background="#052e16";
-          toast.style.borderColor="#22C55E";
-          toast.style.color="#22C55E";
-          toast.textContent="✅ Property data saved!";
-          setTimeout(function(){try{document.body.removeChild(toast);}catch(e){}},3000);
-        }).catch(function(e){
-          toast.style.background="#2d0000";
-          toast.style.borderColor="#EF4444";
-          toast.style.color="#EF4444";
-          toast.textContent="❌ Save failed: "+e.message;
-          setTimeout(function(){try{document.body.removeChild(toast);}catch(e){}},8000);
-        });
-      }
-    }).catch(function(e){
-      var existing=document.getElementById("load-toast-"+prop.id);
-      if(existing){
-        existing.textContent="❌ Load failed: "+e.message;
-        existing.style.borderColor="#EF4444";
-        existing.style.color="#EF4444";
-        setTimeout(function(){try{document.body.removeChild(existing);}catch(e){}},8000);
-      }
-      setFullLoaded(true); // Don't retry on error
-    });
-  },[prop&&prop.id]);
   const [showTmplPicker,setShowTmplPicker]=useState(false);
   const [newSecName,setNewSecName]=useState("");
   const [showNewSec,setShowNewSec]=useState(false);
@@ -3128,6 +3051,30 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
       <AssignModal prop={assignTarget} cleaners={cleaners} availability={availability} onAssign={assign} onClose={function(){setAssignTarget(null);}}/>
     </div>
   );
+
+  // When a property is selected, load full JSONB data from Supabase
+  useEffect(function(){
+    if(!sel)return;
+    var p=props.find(function(x){return x.id===sel;});
+    if(!p||!p.id||!p.id.includes("-"))return;
+    // Skip if already loaded
+    if(p._fullLoaded)return;
+    getPropertyFull(p.id).then(function(full){
+      if(!full)return;
+      setProps(function(ps){return ps.map(function(pp){
+        if(pp.id!==p.id)return pp;
+        return Object.assign({},pp,{
+          _fullLoaded:true,
+          tasks:full.tasks&&full.tasks.length>0?full.tasks:pp.tasks||[],
+          rooms:full.rooms&&full.rooms.length>0?full.rooms:pp.rooms||[],
+          inventory:full.inventory&&full.inventory.length>0?full.inventory:pp.inventory||[],
+          cleanerPhotos:full.cleanerPhotos||pp.cleanerPhotos||[],
+          linenBagPhotos:full.linenBagPhotos||pp.linenBagPhotos||[],
+          cleanerNotes:full.cleanerNotes||pp.cleanerNotes||"",
+        });
+      });});
+    }).catch(function(e){console.error("Load full property failed:",e.message);});
+  },[sel]);
 
   if(sel){
     var prop=props.find(p=>p.id===sel);
