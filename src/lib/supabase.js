@@ -135,7 +135,7 @@ export async function getTeamCleaners(managerId) {
 export async function getProperties(managerId) {
   const { data, error } = await supabase
     .from('properties')
-    .select('*')
+    .select('id,manager_id,name,address,type,pay,bedrooms,bathrooms,photo,notes,check_in,check_out,same_day,access_code,supply_info,alarm_code,linen_rate,total_beds,linen_bags,assigned_to,guest_rating,created_at,tasks_data,rooms_data,inventory_data,schedule,cleaner_photos,linen_bag_photos,cleaner_notes')
     .eq('manager_id', managerId)
     .order('created_at', { ascending: true })
   if (error) throw error
