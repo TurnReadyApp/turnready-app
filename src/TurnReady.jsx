@@ -1924,7 +1924,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     setDragTaskId(null);setDragOverTaskId(null);
                   }}
                   onDragEnd={function(){setDragTaskId(null);setDragOverTaskId(null);}}
-                  style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 0",overflow:"hidden",
+                  style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 0",
                     borderBottom:"1px solid #1A1A1A",
                     background:dragOverTaskId===t.id?"rgba(204,0,0,.12)":"transparent",
                     borderRadius:dragOverTaskId===t.id?6:0,
@@ -1947,9 +1947,9 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                         return tk.id!==t.id?tk:Object.assign({},tk,{label:e.target.value});
                       })});
                     });});}}
-                    style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,
+                    style={{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",fontSize:13,
                       color:t.done?C.muted:C.white,textDecoration:t.done?"line-through":"none",
-                      fontFamily:"Inter,sans-serif",padding:0}}/>
+                      fontFamily:"Inter,sans-serif",padding:0,wordBreak:"break-word",overflowWrap:"break-word"}}/>
                   <button onClick={function(){setProps(function(ps){return ps.map(function(pp){
                     return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).filter(function(tk){return tk.id!==t.id;})});
                   });});}}
