@@ -1754,7 +1754,22 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                 var file=e.target.files[0];
                 if(!file)return;
                 var reader=new FileReader();
-                reader.onload=ev=>setProps(ps=>ps.map(pp=>pp.id!==prop.id?pp:{...pp,photo:ev.target.result}));
+                reader.onload=function(ev){
+                  var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(ex){}
+                  compressImage(ev.target.result,1200,800,0.8,function(compressed){
+                    if(isReal&&prop.id&&prop.id.includes("-")){
+                      uploadImageToStorage("property-media","properties/"+prop.id+"/cover-"+Date.now()+".jpg",compressed).then(function(url){
+                        setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:url});});});
+                        updateProperty(prop.id,{photo:url}).catch(function(e){console.error("Cover photo save:",e.message);});
+                      }).catch(function(){
+                        // Storage failed — keep base64 in state for display only
+                        setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
+                      });
+                    } else {
+                      setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
+                    }
+                  });
+                };
                 reader.readAsDataURL(file);
               }}/>
           </label>
@@ -2522,6 +2537,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     if(isReal&&prop.id&&prop.id.includes("-")){
                       uploadImageToStorage("property-media","properties/"+prop.id+"/cover-"+Date.now()+".jpg",compressed).then(function(url){
                         setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:url});});});
+                        updateProperty(prop.id,{photo:url}).catch(function(e){console.error("Cover photo save:",e.message);});
                       }).catch(function(){
                         setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
                       });
@@ -2540,6 +2556,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     if(isReal&&prop.id&&prop.id.includes("-")){
                       uploadImageToStorage("property-media","properties/"+prop.id+"/cover-"+Date.now()+".jpg",compressed).then(function(url){
                         setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:url});});});
+                        updateProperty(prop.id,{photo:url}).catch(function(e){console.error("Cover photo save:",e.message);});
                       }).catch(function(){
                         setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
                       });
@@ -6865,7 +6882,7 @@ function Messages({user,cleaners,addNotification}){
   const [input,setInput]=useState("");
   const [mediaPreview,setMediaPreview]=useState(null); // {url, type:'image'|'video', name}
 
-  // Real managers: show only real cleaners (UUID ids) — never demo Maria/James/Priya (c1/c2/c3)
+  // Real managers: show only real cleaners (UUID ids) — filter out demo Maria/James/Priya (c1/c2/c3)
   var _rmgr=user&&user.id&&user.id.includes("-");
   var contactList=isManager
     ?(_rmgr?cleaners.filter(function(c){return c.id&&c.id.includes("-");}):cleaners)
@@ -9235,8 +9252,8 @@ export default function App() {
             }
           }).catch(function(e){console.error("Jobs load failed:",e.message);});
           // Load properties from Supabase ONLY — never pre-load from localStorage cache.
-          // tasks/rooms/inventory always start [] and load lazily via getPropertyFull.
-          // _fullLoaded always false so getPropertyFull always runs when property is opened.
+          // tasks/rooms/inventory always [] here; load lazily via getPropertyFull when property is opened.
+          // _fullLoaded always false so getPropertyFull runs every time.
           getProperties(profile.id).then(function(dbProps){
             var _mp=(dbProps||[]).map(function(p){
               return Object.assign({},p,{
@@ -9251,7 +9268,7 @@ export default function App() {
             setProps(_mp);
             console.log("[TurnReady] Session restore: loaded",_mp.length,"properties from Supabase");
           }).catch(function(e){console.error("[TurnReady] Session restore failed:",e&&e.message);});
-          // Real users: load real cleaners only — no demo Maria/James/Priya injection
+          // Real users: load real cleaners only — never inject demo Maria/James/Priya
           getTeamCleaners(profile.id).then(function(dbCleaners){
             var _de=INIT_CLEANERS.map(function(c){return c.email;});
             var _rc=(dbCleaners||[]).filter(function(c){return _de.indexOf(c.email)<0;});
@@ -9371,7 +9388,6 @@ export default function App() {
     propsSyncTimer.current=setTimeout(function(){
       props.forEach(function(p){
         if(!p.id||!p.id.includes("-"))return;
-        // Strip large base64 videos from rooms before syncing
         var roomsForSync=(p.rooms||[]).map(function(r){
           return Object.assign({},r,{
             video: r.video?(r.video.startsWith("http")?r.video:(r.video.length<10000000?r.video:null)):null,
@@ -9382,7 +9398,7 @@ export default function App() {
           });
         });
         // Build sync payload — never include photo unless it's a Storage URL.
-        // Passing photo:undefined when base64 was setting DB photo=null, killing cover photos.
+        // Syncing undefined/base64 as photo was overwriting DB value with null.
         var _sp={
           name:p.name,address:p.address,type:p.type,pay:p.pay,bedrooms:p.bedrooms,bathrooms:p.bathrooms,
           notes:p.notes,checkIn:p.checkIn||p.check_in,checkOut:p.checkOut||p.check_out,
@@ -9394,11 +9410,11 @@ export default function App() {
           linenBagPhotos:(p.linenBagPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
           cleanerNotes:p.cleanerNotes,
         };
-        // Only sync photo if it is already a Supabase Storage URL — never sync base64 or null
+        // Only include photo if it is a real Storage URL
         if(p.photo&&p.photo.startsWith("http"))_sp.photo=p.photo;
-        // CRITICAL: Only sync tasks/rooms/inventory if _fullLoaded is true.
-        // If _fullLoaded is false, p.tasks/rooms/inventory are [] (lazy-load placeholders).
-        // Writing [] to the DB would permanently wipe the real data saved there.
+        // CRITICAL: Only write tasks/rooms/inventory when _fullLoaded is true.
+        // When false, p.tasks/rooms/inventory are [] (lazy-load placeholders from getProperties).
+        // Writing [] would permanently erase the real data saved in Supabase.
         if(p._fullLoaded){
           _sp.tasks=p.tasks;
           _sp.rooms=roomsForSync;
