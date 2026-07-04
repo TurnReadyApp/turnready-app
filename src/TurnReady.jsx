@@ -6865,7 +6865,7 @@ function Messages({user,cleaners,addNotification}){
   const [input,setInput]=useState("");
   const [mediaPreview,setMediaPreview]=useState(null); // {url, type:'image'|'video', name}
 
-  // Real managers: show only real cleaners (UUID ids) — filter out demo Maria/James/Priya (c1/c2/c3)
+  // Real managers: show only real cleaners (UUID ids) — never demo Maria/James/Priya (c1/c2/c3)
   var _rmgr=user&&user.id&&user.id.includes("-");
   var contactList=isManager
     ?(_rmgr?cleaners.filter(function(c){return c.id&&c.id.includes("-");}):cleaners)
@@ -9165,11 +9165,10 @@ export default function App() {
         }
       });
     }catch(e){}
-    // Real users: wipe ALL prop caches on every startup — Supabase is the only source of truth.
-    // Cached props caused: stale _fullLoaded flags, empty task arrays, null cover photos on refresh.
+    // Real users: delete ALL prop caches on startup — Supabase is the only source of truth.
     try{
-      var _sr=localStorage.getItem("turnready_is_real_user");
-      if(_sr==="true"){
+      var _isR=localStorage.getItem("turnready_is_real_user");
+      if(_isR==="true"){
         localStorage.removeItem("turnready_shared_props");
         Object.keys(localStorage).forEach(function(k){
           if(k.startsWith("tr_props_")||k.startsWith("turnready_mgr_"))localStorage.removeItem(k);
@@ -9235,9 +9234,9 @@ export default function App() {
               setJobs(mappedJobs);
             }
           }).catch(function(e){console.error("Jobs load failed:",e.message);});
-          // Load properties from Supabase ONLY — never read from localStorage cache.
-          // tasks/rooms/inventory always start as [] and load lazily via getPropertyFull.
-          // _fullLoaded is always false so getPropertyFull always runs when property is opened.
+          // Load properties from Supabase ONLY — never pre-load from localStorage cache.
+          // tasks/rooms/inventory always start [] and load lazily via getPropertyFull.
+          // _fullLoaded always false so getPropertyFull always runs when property is opened.
           getProperties(profile.id).then(function(dbProps){
             var _mp=(dbProps||[]).map(function(p){
               return Object.assign({},p,{
@@ -9251,8 +9250,8 @@ export default function App() {
             });
             setProps(_mp);
             console.log("[TurnReady] Session restore: loaded",_mp.length,"properties from Supabase");
-          }).catch(function(e){console.error("[TurnReady] Session restore getProperties failed:",e&&e.message);});
-          // Real users: load real cleaners only — never inject demo Maria/James/Priya
+          }).catch(function(e){console.error("[TurnReady] Session restore failed:",e&&e.message);});
+          // Real users: load real cleaners only — no demo Maria/James/Priya injection
           getTeamCleaners(profile.id).then(function(dbCleaners){
             var _de=INIT_CLEANERS.map(function(c){return c.email;});
             var _rc=(dbCleaners||[]).filter(function(c){return _de.indexOf(c.email)<0;});
@@ -9371,24 +9370,19 @@ export default function App() {
     if(propsSyncTimer.current)clearTimeout(propsSyncTimer.current);
     propsSyncTimer.current=setTimeout(function(){
       props.forEach(function(p){
-        // Only sync props that have a UUID-style id (real Supabase props, not demo p1/p2/p3)
-        if(!p.id||!p.id.includes("-"))return; // Only sync real Supabase UUIDs (contain dashes like "abc-def-...")
-        // Strip large base64 videos from rooms before syncing (keep photos only, compress separately)
+        if(!p.id||!p.id.includes("-"))return;
+        // Strip large base64 videos from rooms before syncing
         var roomsForSync=(p.rooms||[]).map(function(r){
           return Object.assign({},r,{
-            // If video is a Storage URL (https://), keep it as-is
-            // If video is base64 and under 8MB, keep it
-            // If video is base64 and over 8MB (huge), strip it
             video: r.video?(r.video.startsWith("http")?r.video:(r.video.length<10000000?r.video:null)):null,
             preVideo: r.preVideo?(r.preVideo.startsWith("http")?r.preVideo:(r.preVideo.length<10000000?r.preVideo:null)):null,
             refVideo: r.refVideo?(r.refVideo.startsWith("http")?r.refVideo:(r.refVideo.length<10000000?r.refVideo:null)):null,
-            // Strip object URLs (blob:) - these are temporary preview URLs
             videoUploading: false,
             refVideoUploading: false,
           });
         });
-        // Build sync payload. CRITICAL: never include photo unless it's a Storage URL.
-        // Passing photo:undefined when base64 was setting DB photo=null, killing cover photos on refresh.
+        // Build sync payload — never include photo unless it's a Storage URL.
+        // Passing photo:undefined when base64 was setting DB photo=null, killing cover photos.
         var _sp={
           name:p.name,address:p.address,type:p.type,pay:p.pay,bedrooms:p.bedrooms,bathrooms:p.bathrooms,
           notes:p.notes,checkIn:p.checkIn||p.check_in,checkOut:p.checkOut||p.check_out,
@@ -9396,13 +9390,20 @@ export default function App() {
           supplyInfo:p.supplyInfo||p.supply_info,alarmCode:p.alarmCode||p.alarm_code,
           linenRate:p.linenRate||p.linen_rate,totalBeds:p.totalBeds||p.total_beds,
           schedule:p.schedule,linenBags:p.linenBags,assignedTo:p.assignedTo,guest_rating:p.guestRating,
-          tasks:p.tasks,rooms:roomsForSync,inventory:p.inventory,
           cleanerPhotos:(p.cleanerPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
           linenBagPhotos:(p.linenBagPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
           cleanerNotes:p.cleanerNotes,
         };
-        // Only sync photo if it is already a Supabase Storage URL
+        // Only sync photo if it is already a Supabase Storage URL — never sync base64 or null
         if(p.photo&&p.photo.startsWith("http"))_sp.photo=p.photo;
+        // CRITICAL: Only sync tasks/rooms/inventory if _fullLoaded is true.
+        // If _fullLoaded is false, p.tasks/rooms/inventory are [] (lazy-load placeholders).
+        // Writing [] to the DB would permanently wipe the real data saved there.
+        if(p._fullLoaded){
+          _sp.tasks=p.tasks;
+          _sp.rooms=roomsForSync;
+          _sp.inventory=p.inventory;
+        }
         updateProperty(p.id,_sp).catch(function(e){
           console.error("❌ Supabase sync failed for property",p.id,"Error:",e.message,"Code:",e.code);
         });
@@ -9410,8 +9411,7 @@ export default function App() {
     },800);
   },[props]);
 
-  // Persist manager data — demo accounts only.
-  // Real users: NEVER cache props in localStorage. Supabase is source of truth.
+  // Persist manager data — demo accounts only. Real users: Supabase is source of truth.
   useEffect(function(){
     if(!user||user.role!=="manager")return;
     var _pr=false;try{_pr=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
