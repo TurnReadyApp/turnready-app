@@ -6865,11 +6865,10 @@ function Messages({user,cleaners,addNotification}){
   const [input,setInput]=useState("");
   const [mediaPreview,setMediaPreview]=useState(null); // {url, type:'image'|'video', name}
 
-  // List to show: manager sees real cleaners only (UUID ids); cleaner sees only their manager
-  // Demo cleaners (Maria/James/Priya with ids c1/c2/c3) are filtered out for real managers
-  var isRealManagerUser=user&&user.id&&user.id.includes("-");
+  // Real managers: show only real cleaners (UUID ids) — filter out demo Maria/James/Priya (c1/c2/c3)
+  var _rmgr=user&&user.id&&user.id.includes("-");
   var contactList=isManager
-    ?(isRealManagerUser?cleaners.filter(function(c){return c.id&&c.id.includes("-");}):cleaners)
+    ?(_rmgr?cleaners.filter(function(c){return c.id&&c.id.includes("-");}):cleaners)
     :[{id:"mgr1",name:"Harvey Johnson",avatar:"HJ",role:"manager",email:"manager@turnready.app"}];
 
   // Load messages from Supabase when contact is selected
@@ -9166,18 +9165,13 @@ export default function App() {
         }
       });
     }catch(e){}
-    // ── REAL USER CACHE WIPE ──────────────────────────────────────────────────
-    // For real (Supabase) users: delete ALL prop caches on every startup.
-    // Supabase is the only source of truth. localStorage caches caused:
-    //   • stale _fullLoaded:true flags blocking getPropertyFull
-    //   • empty tasks/rooms/inventory arrays overwriting fresh DB data
-    //   • cover photos being null after refresh (base64 was stripped, null was saved)
+    // Real users: wipe ALL prop caches on every startup — Supabase is the only source of truth.
+    // Cached props caused: stale _fullLoaded flags, empty task arrays, null cover photos on refresh.
     try{
-      var isRealCheck=localStorage.getItem("turnready_is_real_user");
-      if(isRealCheck==="true"){
+      var _sr=localStorage.getItem("turnready_is_real_user");
+      if(_sr==="true"){
         localStorage.removeItem("turnready_shared_props");
-        var startupKeys=Object.keys(localStorage);
-        startupKeys.forEach(function(k){
+        Object.keys(localStorage).forEach(function(k){
           if(k.startsWith("tr_props_")||k.startsWith("turnready_mgr_"))localStorage.removeItem(k);
         });
       }
@@ -9241,51 +9235,32 @@ export default function App() {
               setJobs(mappedJobs);
             }
           }).catch(function(e){console.error("Jobs load failed:",e.message);});
-          // ── LOAD PROPERTIES FROM SUPABASE ONLY ───────────────────────────────
-          // Never pre-load from localStorage — stale cache caused data to vanish on refresh.
-          // tasks/rooms/inventory start as [] and are loaded lazily via getPropertyFull
-          // when a property is opened. _fullLoaded is always false so it always runs fresh.
+          // Load properties from Supabase ONLY — never read from localStorage cache.
+          // tasks/rooms/inventory always start as [] and load lazily via getPropertyFull.
+          // _fullLoaded is always false so getPropertyFull always runs when property is opened.
           getProperties(profile.id).then(function(dbProps){
-            var mapped=(dbProps||[]).map(function(p){
+            var _mp=(dbProps||[]).map(function(p){
               return Object.assign({},p,{
-                schedule:p.schedule||[],
-                tasks:[],
-                rooms:[],
-                inventory:[],
-                _fullLoaded:false,
-                checkIn:p.checkIn||p.check_in||"4:00 PM",
-                checkOut:p.checkOut||p.check_out||"11:00 AM",
-                sameDay:p.sameDay||p.same_day||false,
-                accessCode:p.accessCode||p.access_code||"",
-                supplyInfo:p.supplyInfo||p.supply_info||"",
-                alarmCode:p.alarmCode||p.alarm_code||"",
-                linenRate:p.linenRate||p.linen_rate||10,
-                linenBags:p.linenBags||p.linen_bags||0,
-                totalBeds:p.totalBeds||p.total_beds||1,
-                assignedTo:p.assignedTo||p.assigned_to||null,
+                schedule:p.schedule||[],tasks:[],rooms:[],inventory:[],_fullLoaded:false,
+                checkIn:p.checkIn||p.check_in||"4:00 PM",checkOut:p.checkOut||p.check_out||"11:00 AM",
+                sameDay:p.sameDay||p.same_day||false,accessCode:p.accessCode||p.access_code||"",
+                supplyInfo:p.supplyInfo||p.supply_info||"",alarmCode:p.alarmCode||p.alarm_code||"",
+                linenRate:p.linenRate||p.linen_rate||10,linenBags:p.linenBags||p.linen_bags||0,
+                totalBeds:p.totalBeds||p.total_beds||1,assignedTo:p.assignedTo||p.assigned_to||null,
               });
             });
-            setProps(mapped);
-          }).catch(function(e){
-            console.error("getProperties failed on session restore:",e&&e.message);
-          });
-          // Load cleaners — real users get real cleaners only (no demo Maria/James/Priya)
+            setProps(_mp);
+            console.log("[TurnReady] Session restore: loaded",_mp.length,"properties from Supabase");
+          }).catch(function(e){console.error("[TurnReady] Session restore getProperties failed:",e&&e.message);});
+          // Real users: load real cleaners only — never inject demo Maria/James/Priya
           getTeamCleaners(profile.id).then(function(dbCleaners){
-            if(dbCleaners&&dbCleaners.length>0){
-              var demoEmails=INIT_CLEANERS.map(function(c){return c.email;});
-              var realOnly=dbCleaners.filter(function(c){return demoEmails.indexOf(c.email)<0;});
-              setCleaners(realOnly.map(function(c){
-                return Object.assign({},c,{
-                  avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
-                  totalEarned:c.total_earned||0,
-                  jobsCompleted:c.jobs_completed||0,
-                  stripeStatus:c.stripe_status||"pending",
-                  joinedAt:c.joined_at||new Date().toISOString(),
-                });
-              }));
-            } else {
-              setCleaners([]);
-            }
+            var _de=INIT_CLEANERS.map(function(c){return c.email;});
+            var _rc=(dbCleaners||[]).filter(function(c){return _de.indexOf(c.email)<0;});
+            setCleaners(_rc.map(function(c){return Object.assign({},c,{
+              avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
+              totalEarned:c.total_earned||0,jobsCompleted:c.jobs_completed||0,
+              stripeStatus:c.stripe_status||"pending",joinedAt:c.joined_at||new Date().toISOString(),
+            });}));
           }).catch(function(){setCleaners([]);});
         }
       }
@@ -9412,78 +9387,44 @@ export default function App() {
             refVideoUploading: false,
           });
         });
-        // Build the update object - only include photo if it's a real Storage URL.
-        // If photo is base64 or null, exclude it entirely so we don't overwrite a
-        // valid DB value with null (which happened before and caused photos to vanish on refresh).
-        var syncUpdate={
-          name:p.name,
-          address:p.address,
-          type:p.type,
-          pay:p.pay,
-          bedrooms:p.bedrooms,
-          bathrooms:p.bathrooms,
-          notes:p.notes,
-          checkIn:p.checkIn||p.check_in,
-          checkOut:p.checkOut||p.check_out,
-          sameDay:p.sameDay||p.same_day,
-          accessCode:p.accessCode||p.access_code,
-          supplyInfo:p.supplyInfo||p.supply_info,
-          alarmCode:p.alarmCode||p.alarm_code,
-          linenRate:p.linenRate||p.linen_rate,
-          totalBeds:p.totalBeds||p.total_beds,
-          schedule:p.schedule,
-          linenBags:p.linenBags,
-          assignedTo:p.assignedTo,
-          guest_rating:p.guestRating,
-          tasks:p.tasks,
-          rooms:roomsForSync,
-          inventory:p.inventory,
+        // Build sync payload. CRITICAL: never include photo unless it's a Storage URL.
+        // Passing photo:undefined when base64 was setting DB photo=null, killing cover photos on refresh.
+        var _sp={
+          name:p.name,address:p.address,type:p.type,pay:p.pay,bedrooms:p.bedrooms,bathrooms:p.bathrooms,
+          notes:p.notes,checkIn:p.checkIn||p.check_in,checkOut:p.checkOut||p.check_out,
+          sameDay:p.sameDay||p.same_day,accessCode:p.accessCode||p.access_code,
+          supplyInfo:p.supplyInfo||p.supply_info,alarmCode:p.alarmCode||p.alarm_code,
+          linenRate:p.linenRate||p.linen_rate,totalBeds:p.totalBeds||p.total_beds,
+          schedule:p.schedule,linenBags:p.linenBags,assignedTo:p.assignedTo,guest_rating:p.guestRating,
+          tasks:p.tasks,rooms:roomsForSync,inventory:p.inventory,
           cleanerPhotos:(p.cleanerPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
           linenBagPhotos:(p.linenBagPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
           cleanerNotes:p.cleanerNotes,
         };
-        // Only sync cover photo if it's a Storage URL — never sync base64 or null.
-        // Syncing base64 as undefined set DB photo to null, making it vanish on refresh.
-        if(p.photo&&p.photo.startsWith("http"))syncUpdate.photo=p.photo;
-        updateProperty(p.id,syncUpdate).catch(function(e){
+        // Only sync photo if it is already a Supabase Storage URL
+        if(p.photo&&p.photo.startsWith("http"))_sp.photo=p.photo;
+        updateProperty(p.id,_sp).catch(function(e){
           console.error("❌ Supabase sync failed for property",p.id,"Error:",e.message,"Code:",e.code);
         });
       });
     },800);
   },[props]);
 
-  // Persist manager-specific data when they make changes
-  // ── REAL USERS: never cache props in localStorage ──────────────────────────
-  // Writing props caused the refresh bug: stale empty-array snapshots overwrote
-  // fresh Supabase data. Supabase auto-sync (debounced effect above) handles persistence.
+  // Persist manager data — demo accounts only.
+  // Real users: NEVER cache props in localStorage. Supabase is source of truth.
   useEffect(function(){
     if(!user||user.role!=="manager")return;
-    var isRealMgr=false;try{isRealMgr=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
-    if(isRealMgr){
-      // Real users: only persist notifications locally; everything else lives in Supabase
-      try{localStorage.setItem("turnready_notifs_"+user.id,JSON.stringify(notifications.slice(0,50)));}catch(e){}
-      return;
-    }
-    // Demo manager only: full localStorage persist
-    try{
-      localStorage.setItem("turnready_mgr_"+user.id,JSON.stringify({
-        props:props,
-        cleaners:cleaners,
-        jobs:jobs,
-        notifications:notifications.slice(0,50),
-      }));
-    }catch(e){}
+    var _pr=false;try{_pr=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
+    if(_pr){try{localStorage.setItem("turnready_notifs_"+user.id,JSON.stringify(notifications.slice(0,50)));}catch(e){}return;}
+    try{localStorage.setItem("turnready_mgr_"+user.id,JSON.stringify({props:props,cleaners:cleaners,jobs:jobs,notifications:notifications.slice(0,50)}));}catch(e){}
   },[props,cleaners,jobs,notifications,user]);
 
-  // Persist jobs and removals. Props are NOT written for real users — Supabase is source of truth.
+  // Persist jobs/removals. Real users: NEVER cache props — Supabase is source of truth.
   useEffect(function(){
     if(!user)return;
-    var isRealUser=false;try{isRealUser=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
+    var _rr=false;try{_rr=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
     try{
-      if(!isRealUser){
-        // Demo accounts only: cache props locally
-        localStorage.setItem("turnready_shared_props",JSON.stringify(props));
-      }
+      if(!_rr)localStorage.setItem("turnready_shared_props",JSON.stringify(props));
       localStorage.setItem("turnready_shared_jobs",JSON.stringify(jobs));
       localStorage.setItem("turnready_shared_removals",JSON.stringify(pendingRemovals));
     }catch(e){}
@@ -9587,17 +9528,11 @@ export default function App() {
     return function(){clearInterval(interval);};
   },[props,cleaners,notifications,availability]);
 
-  // Persist cleaners to localStorage (demo accounts only)
+  // Persist cleaners — demo accounts only. Real users always reload from Supabase.
   useEffect(function(){
-    var isRealC=false;try{isRealC=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
-    if(isRealC)return; // Real users: cleaners always loaded from Supabase, never cached
-    try{
-      var initIds=INIT_CLEANERS.map(function(c){return c.id;});
-      var extra=cleaners.filter(function(c){return initIds.indexOf(c.id)<0;});
-      if(extra.length>0){
-        localStorage.setItem("turnready_cleaners",JSON.stringify(cleaners));
-      }
-    }catch(e){}
+    var _rc=false;try{_rc=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
+    if(_rc)return;
+    try{var initIds=INIT_CLEANERS.map(function(c){return c.id;});var extra=cleaners.filter(function(c){return initIds.indexOf(c.id)<0;});if(extra.length>0)localStorage.setItem("turnready_cleaners",JSON.stringify(cleaners));}catch(e){}
   },[cleaners]);
 
   // Request push permission on load
@@ -9698,76 +9633,43 @@ export default function App() {
             setUser(u);
             if(u.role==="cleaner")setView("Home");
             if(u.role==="manager")setView("Dashboard");
-            // ── REAL MANAGERS: always load from Supabase, never from localStorage ──
-            // localStorage caches caused properties/photos to vanish on refresh.
-            // Supabase is the single source of truth for all real (UUID) users.
+            // Real managers: always load from Supabase — never from localStorage cache.
             if(u.role==="manager"&&u.id!=="mgr1"){
-              setProps([]);
-              setJobs([]);
-              // Load properties - tasks/rooms/inventory load lazily via getPropertyFull
+              setProps([]);setCleaners([]);setJobs([]);setNotifications([]);
               getProperties(u.id).then(function(dbProps){
-                var mapped=(dbProps||[]).map(function(p){
-                  return Object.assign({},p,{
-                    schedule:p.schedule||[],
-                    tasks:[],
-                    rooms:[],
-                    inventory:[],
-                    _fullLoaded:false,
-                    checkIn:p.checkIn||p.check_in||"4:00 PM",
-                    checkOut:p.checkOut||p.check_out||"11:00 AM",
-                    sameDay:p.sameDay||p.same_day||false,
-                    accessCode:p.accessCode||p.access_code||"",
-                    supplyInfo:p.supplyInfo||p.supply_info||"",
-                    alarmCode:p.alarmCode||p.alarm_code||"",
-                    linenRate:p.linenRate||p.linen_rate||10,
-                    linenBags:p.linenBags||p.linen_bags||0,
-                    totalBeds:p.totalBeds||p.total_beds||1,
-                    assignedTo:p.assignedTo||p.assigned_to||null,
-                  });
-                });
-                setProps(mapped);
-                if(mapped.length===0)setManagerPolicy(TEMPLATE_POLICIES);
-              }).catch(function(e){console.error("Login getProperties failed:",e&&e.message);});
-              // Load cleaners from Supabase (real cleaners only — no demo injection)
+                var _lm=(dbProps||[]).map(function(p){return Object.assign({},p,{
+                  schedule:p.schedule||[],tasks:[],rooms:[],inventory:[],_fullLoaded:false,
+                  checkIn:p.checkIn||p.check_in||"4:00 PM",checkOut:p.checkOut||p.check_out||"11:00 AM",
+                  sameDay:p.sameDay||p.same_day||false,accessCode:p.accessCode||p.access_code||"",
+                  supplyInfo:p.supplyInfo||p.supply_info||"",alarmCode:p.alarmCode||p.alarm_code||"",
+                  linenRate:p.linenRate||p.linen_rate||10,linenBags:p.linenBags||p.linen_bags||0,
+                  totalBeds:p.totalBeds||p.total_beds||1,assignedTo:p.assignedTo||p.assigned_to||null,
+                });});
+                setProps(_lm);
+                if(_lm.length===0)setManagerPolicy(TEMPLATE_POLICIES);
+                console.log("[TurnReady] Login: loaded",_lm.length,"properties from Supabase");
+              }).catch(function(e){console.error("[TurnReady] Login getProperties failed:",e&&e.message);});
               getTeamCleaners(u.id).then(function(dbCleaners){
-                if(dbCleaners&&dbCleaners.length>0){
-                  var demoEmails=INIT_CLEANERS.map(function(c){return c.email;});
-                  var realOnly=dbCleaners.filter(function(c){return demoEmails.indexOf(c.email)<0;});
-                  // Only add INIT_CLEANERS for the demo account; real managers get real cleaners only
-                  setCleaners(realOnly.map(function(c){
-                    return Object.assign({},c,{
-                      avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
-                      totalEarned:c.total_earned||0,
-                      jobsCompleted:c.jobs_completed||0,
-                      stripeStatus:c.stripe_status||"pending",
-                      joinedAt:c.joined_at||new Date().toISOString(),
-                    });
-                  }));
-                } else {
-                  setCleaners([]);
-                }
+                var _de=INIT_CLEANERS.map(function(c){return c.email;});
+                var _rc=(dbCleaners||[]).filter(function(c){return _de.indexOf(c.email)<0;});
+                setCleaners(_rc.map(function(c){return Object.assign({},c,{
+                  avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
+                  totalEarned:c.total_earned||0,jobsCompleted:c.jobs_completed||0,
+                  stripeStatus:c.stripe_status||"pending",joinedAt:c.joined_at||new Date().toISOString(),
+                });}));
               }).catch(function(){setCleaners([]);});
-              // Load jobs from Supabase
               getJobs({}).then(function(dbJobs){
-                if(dbJobs&&dbJobs.length>0){
-                  setJobs(dbJobs.map(function(j){
-                    return Object.assign({},j,{
-                      dbId:j.id,id:j.id,propertyId:j.property_id,
-                      propertyName:j.property_name,cleanerId:j.cleaner_id,
-                      completedAt:j.completed_at,paidAt:j.paid_at,startedAt:j.started_at,
-                      rejectReason:j.rejection_reason,
-                      durationStr:j.duration_seconds?Math.floor(j.duration_seconds/3600)+"h "+Math.floor((j.duration_seconds%3600)/60)+"m":"",
-                      tasks:j.tasks||[],inventory:j.inventory||[],uploads:j.uploads||[],
-                    });
-                  }));
-                }
-              }).catch(function(e){console.error("Login getJobs failed:",e&&e.message);});
-              try{var sharedRem=localStorage.getItem("turnready_shared_removals");if(sharedRem){var srr=JSON.parse(sharedRem);if(srr&&srr.length)setPendingRemovals(srr);}}catch(e){}
+                if(dbJobs&&dbJobs.length>0)setJobs(dbJobs.map(function(j){return Object.assign({},j,{
+                  dbId:j.id,id:j.id,propertyId:j.property_id,propertyName:j.property_name,
+                  cleanerId:j.cleaner_id,completedAt:j.completed_at,paidAt:j.paid_at,startedAt:j.started_at,
+                  rejectReason:j.rejection_reason,
+                  durationStr:j.duration_seconds?Math.floor(j.duration_seconds/3600)+"h "+Math.floor((j.duration_seconds%3600)/60)+"m":"",
+                  tasks:j.tasks||[],inventory:j.inventory||[],uploads:j.uploads||[],
+                });}));
+              }).catch(function(e){console.error("[TurnReady] Login getJobs failed:",e&&e.message);});
+              try{var _rem=localStorage.getItem("turnready_shared_removals");if(_rem){var _rp=JSON.parse(_rem);if(_rp&&_rp.length)setPendingRemovals(_rp);}}catch(e){}
             } else if(u.role==="manager"){
-              // Demo manager (mgr1) only — use static demo data
-              setProps(INIT_PROPS);
-              setCleaners(INIT_CLEANERS);
-              setJobs(INIT_JOBS);
+              setProps(INIT_PROPS);setCleaners(INIT_CLEANERS);setJobs(INIT_JOBS);
             }
             // New manager - trigger Stripe setup if not connected
             if(u.role==="manager"&&isNew&&(!u.stripeBusinessStatus||u.stripeBusinessStatus==="not_connected")){
