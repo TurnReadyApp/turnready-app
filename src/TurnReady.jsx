@@ -3057,23 +3057,42 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
     if(!sel)return;
     var p=props.find(function(x){return x.id===sel;});
     if(!p||!p.id||!p.id.includes("-"))return;
-    // Skip if already loaded
     if(p._fullLoaded)return;
+    var t=document.createElement("div");
+    t.style.cssText="position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #4444ff;color:#8888ff;font-size:10px;padding:6px 14px;border-radius:12px;z-index:9999;";
+    t.textContent="🔵 Loading "+p.name+" from DB...";
+    document.body.appendChild(t);
     getPropertyFull(p.id).then(function(full){
-      if(!full)return;
-      setProps(function(ps){return ps.map(function(pp){
-        if(pp.id!==p.id)return pp;
-        return Object.assign({},pp,{
-          _fullLoaded:true,
-          tasks:full.tasks&&full.tasks.length>0?full.tasks:pp.tasks||[],
-          rooms:full.rooms&&full.rooms.length>0?full.rooms:pp.rooms||[],
-          inventory:full.inventory&&full.inventory.length>0?full.inventory:pp.inventory||[],
-          cleanerPhotos:full.cleanerPhotos||pp.cleanerPhotos||[],
-          linenBagPhotos:full.linenBagPhotos||pp.linenBagPhotos||[],
-          cleanerNotes:full.cleanerNotes||pp.cleanerNotes||"",
+      var tasks=(full&&full.tasks)||[];
+      var rooms=(full&&full.rooms)||[];
+      var inv=(full&&full.inventory)||[];
+      t.textContent="🔵 Got: "+tasks.length+"t "+rooms.length+"r "+inv.length+"i — updating state...";
+      setProps(function(ps){
+        var updated=ps.map(function(pp){
+          if(pp.id!==p.id)return pp;
+          return Object.assign({},pp,{
+            _fullLoaded:true,
+            tasks:tasks.length>0?tasks:pp.tasks||[],
+            rooms:rooms.length>0?rooms:pp.rooms||[],
+            inventory:inv.length>0?inv:pp.inventory||[],
+            cleanerPhotos:(full&&full.cleanerPhotos)||pp.cleanerPhotos||[],
+            linenBagPhotos:(full&&full.linenBagPhotos)||pp.linenBagPhotos||[],
+            cleanerNotes:(full&&full.cleanerNotes)||pp.cleanerNotes||"",
+          });
         });
-      });});
-    }).catch(function(e){console.error("Load full property failed:",e.message);});
+        var found=updated.find(function(x){return x.id===p.id;});
+        setTimeout(function(){
+          t.textContent="✅ State: "+(found?found.tasks.length+"t "+found.rooms.length+"r "+found.inventory.length+"i":"NOT FOUND");
+          t.style.borderColor="#22C55E";t.style.color="#22C55E";t.style.background="#052e16";
+          setTimeout(function(){try{document.body.removeChild(t);}catch(e){}},5000);
+        },100);
+        return updated;
+      });
+    }).catch(function(e){
+      t.textContent="❌ "+e.message;
+      t.style.borderColor="#EF4444";t.style.color="#EF4444";
+      setTimeout(function(){try{document.body.removeChild(t);}catch(e){}},8000);
+    });
   },[sel]);
 
   if(sel){
@@ -9146,6 +9165,19 @@ export default function App() {
         }
       });
     }catch(e){}
+    // For real users: clear the prop caches entirely so stale data never overwrites Supabase
+    // Props always reload from Supabase; localStorage is not the source of truth for real users
+    try{
+      var isRealFlag=localStorage.getItem("turnready_is_real_user");
+      if(isRealFlag==="true"){
+        localStorage.removeItem("turnready_shared_props");
+        // Also clear any tr_props_* per-manager caches
+        var keys=Object.keys(localStorage);
+        keys.forEach(function(k){
+          if(k.startsWith("tr_props_"))localStorage.removeItem(k);
+        });
+      }
+    }catch(e){}
     getCurrentUser().then(function(profile){
       if(profile){
         // Mark as real user so demo data doesn't load
@@ -9205,43 +9237,32 @@ export default function App() {
               setJobs(mappedJobs);
             }
           }).catch(function(e){console.error("Jobs load failed:",e.message);});
-          // Load properties - show cache IMMEDIATELY, then refresh from Supabase
-          try{
-            var cachedProps=localStorage.getItem("tr_props_"+profile.id);
-            if(cachedProps){var cp=JSON.parse(cachedProps);if(cp&&cp.length)setProps(cp);}
-          }catch(e){}
+          // Load properties from Supabase (no localStorage cache - avoids stale _fullLoaded flags)
           getProperties(profile.id).then(function(dbProps){
-            if(dbProps&&dbProps.length>0){
-              var mapped=dbProps.map(function(p){
-                return Object.assign({},p,{
-                  schedule:p.schedule||[],
-                  tasks:p.tasks||[],
-                  rooms:p.rooms||[],
-                  inventory:p.inventory||[],
-                  checkIn:p.check_in||"4:00 PM",
-                  checkOut:p.check_out||"11:00 AM",
-                  sameDay:p.same_day||false,
-                  accessCode:p.access_code||"",
-                  supplyInfo:p.supply_info||"",
-                  alarmCode:p.alarm_code||"",
-                  linenRate:p.linen_rate||10,
-                  linenBags:p.linen_bags||0,
-                  totalBeds:p.total_beds||1,
-                  assignedTo:p.assigned_to||null,
-                });
+            // Real users always load from Supabase - never localStorage (avoids stale _fullLoaded flags)
+            var mapped=(dbProps||[]).map(function(p){
+              return Object.assign({},p,{
+                schedule:p.schedule||[],
+                tasks:[],      // Always start empty - loaded lazily by getPropertyFull when property is opened
+                rooms:[],      // Always start empty - loaded lazily
+                inventory:[],  // Always start empty - loaded lazily
+                _fullLoaded:false, // Always reset - force fresh load from Supabase
+                checkIn:p.checkIn||p.check_in||"4:00 PM",
+                checkOut:p.checkOut||p.check_out||"11:00 AM",
+                sameDay:p.sameDay||p.same_day||false,
+                accessCode:p.accessCode||p.access_code||"",
+                supplyInfo:p.supplyInfo||p.supply_info||"",
+                alarmCode:p.alarmCode||p.alarm_code||"",
+                linenRate:p.linenRate||p.linen_rate||10,
+                linenBags:p.linenBags||p.linen_bags||0,
+                totalBeds:p.totalBeds||p.total_beds||1,
+                assignedTo:p.assignedTo||p.assigned_to||null,
               });
-              setProps(mapped);
-            } else {
-              try{
-                var stored=localStorage.getItem("turnready_shared_props");
-                if(stored){var sp=JSON.parse(stored);if(sp&&sp.length)setProps(sp);}
-              }catch(e){}
-            }
-          }).catch(function(){
-            try{
-              var fb=localStorage.getItem("turnready_shared_props");
-              if(fb){var fp=JSON.parse(fb);if(fp&&fp.length)setProps(fp);}
-            }catch(e){}
+            });
+            setProps(mapped);
+          }).catch(function(e){
+            console.error("getProperties failed on session restore:",e&&e.message);
+            // On error, leave props empty - better than showing stale data
           });
           // Load cleaners
           getTeamCleaners(profile.id).then(function(dbCleaners){
@@ -9422,8 +9443,18 @@ export default function App() {
   },[props]);
 
   // Persist manager-specific data when they make changes
+  // NOTE: Real users (Supabase) do NOT cache props in localStorage - causes stale data on refresh
   useEffect(function(){
     if(!user||user.role!=="manager")return;
+    var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
+    if(isReal){
+      // For real users: only persist jobs and notifications (not props - those live in Supabase)
+      try{
+        localStorage.setItem("turnready_mgr_notifs_"+user.id,JSON.stringify(notifications.slice(0,50)));
+      }catch(e){}
+      return;
+    }
+    // Demo users: persist everything as before
     try{
       localStorage.setItem("turnready_mgr_"+user.id,JSON.stringify({
         props:props,
@@ -9432,13 +9463,18 @@ export default function App() {
         notifications:notifications.slice(0,50),
       }));
     }catch(e){}
-  },[props,cleaners,jobs,user]);
+  },[props,cleaners,jobs,notifications,user]);
 
-  // Always save props, jobs, and pendingRemovals to shared key so cleaner changes persist for manager
+  // Persist jobs and removals for cross-session continuity
+  // NOTE: Props are NOT persisted to localStorage for real users - Supabase is source of truth
   useEffect(function(){
     if(!user)return;
+    var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
     try{
-      localStorage.setItem("turnready_shared_props",JSON.stringify(props));
+      if(!isReal){
+        // Demo users: cache props for offline use
+        localStorage.setItem("turnready_shared_props",JSON.stringify(props));
+      }
       localStorage.setItem("turnready_shared_jobs",JSON.stringify(jobs));
       localStorage.setItem("turnready_shared_removals",JSON.stringify(pendingRemovals));
     }catch(e){}
@@ -9652,80 +9688,43 @@ export default function App() {
             setUser(u);
             if(u.role==="cleaner")setView("Home");
             if(u.role==="manager")setView("Dashboard");
-            // New manager gets clean slate
+            // Real managers: always load fresh from Supabase (never localStorage for props)
             if(u.role==="manager"&&u.id!=="mgr1"){
-              // Load this manager's data from localStorage or start fresh
-              try{
-                var mgrData=localStorage.getItem("turnready_mgr_"+u.id);
-                if(mgrData){
-                  var d=JSON.parse(mgrData);
-                  if(d.props)setProps(d.props);
-                  else setProps([]);
-                  if(d.cleaners)setCleaners(d.cleaners);
-                  else setCleaners([]);
-                  if(d.jobs)setJobs(d.jobs);
-                  else setJobs([]);
-                  if(d.notifications)setNotifications(d.notifications);
-                  else setNotifications([]);
-                } else {
-                  // Brand new manager - empty everything
-                  setProps([]);
-                  setCleaners([]);
-                  setJobs([]);
-                  setNotifications([]);
-                  setPendingCleaners([]);
-                  setManagerPolicy(TEMPLATE_POLICIES);
-                }
-              }catch(e){
-                setProps([]);setCleaners([]);setJobs([]);setNotifications([]);
-              }
-            } else if(u.role==="manager"){
-              // Load from Supabase first, fall back to localStorage/demo data
+              // Start with empty state, load everything from Supabase
+              setProps([]);
+              setCleaners([]);
+              setJobs([]);
+              // Load properties from Supabase - tasks/rooms/inventory load lazily when property is opened
               getProperties(u.id).then(function(dbProps){
-                if(dbProps&&dbProps.length>0){
-                  // Map Supabase column names to app field names
-                  var mapped=dbProps.map(function(p){
-                    return Object.assign({},p,{
-                      schedule:p.schedule||[],
-                      tasks:p.tasks||[],
-                      rooms:p.rooms||[],
-                      inventory:p.inventory||[],
-                      checkIn:p.check_in||"4:00 PM",
-                      checkOut:p.check_out||"11:00 AM",
-                      sameDay:p.same_day||false,
-                      accessCode:p.access_code||"",
-                      supplyInfo:p.supply_info||"",
-                      alarmCode:p.alarm_code||"",
-                      linenRate:p.linen_rate||10,
-                      totalBeds:p.total_beds||1,
-                      assignedTo:p.assigned_to||null,
-                    });
+                var mapped=(dbProps||[]).map(function(p){
+                  return Object.assign({},p,{
+                    schedule:p.schedule||[],
+                    tasks:[],      // Lazy loaded by getPropertyFull
+                    rooms:[],      // Lazy loaded by getPropertyFull
+                    inventory:[],  // Lazy loaded by getPropertyFull
+                    _fullLoaded:false, // Always reset so getPropertyFull runs fresh
+                    checkIn:p.checkIn||p.check_in||"4:00 PM",
+                    checkOut:p.checkOut||p.check_out||"11:00 AM",
+                    sameDay:p.sameDay||p.same_day||false,
+                    accessCode:p.accessCode||p.access_code||"",
+                    supplyInfo:p.supplyInfo||p.supply_info||"",
+                    alarmCode:p.alarmCode||p.alarm_code||"",
+                    linenRate:p.linenRate||p.linen_rate||10,
+                    linenBags:p.linenBags||p.linen_bags||0,
+                    totalBeds:p.totalBeds||p.total_beds||1,
+                    assignedTo:p.assignedTo||p.assigned_to||null,
                   });
-                  setProps(mapped);
-                } else {
-                  // No Supabase data yet - use localStorage or demo
-                  try{
-                    var stored=localStorage.getItem("turnready_shared_props");
-                    if(stored){var sp=JSON.parse(stored);if(sp&&sp.length){setProps(sp);return;}}
-                    var mgrStored=localStorage.getItem("turnready_mgr_"+u.id);
-                    if(mgrStored){var md=JSON.parse(mgrStored);if(md.props&&md.props.length){setProps(md.props);return;}}
-                  }catch(e){}
-                  setProps(u.id==="mgr1"?INIT_PROPS:[]);
-                }
-              }).catch(function(){
-                // Fall back to localStorage on Supabase error
-                try{
-                  var fb=localStorage.getItem("turnready_shared_props");
-                  if(fb){var fp=JSON.parse(fb);if(fp&&fp.length){setProps(fp);return;}}
-                }catch(e){}
-                setProps(u.id==="mgr1"?INIT_PROPS:[]);
+                });
+                setProps(mapped);
+              }).catch(function(e){
+                console.error("Login getProperties failed:",e&&e.message);
+                // On Supabase error, leave props empty - don't load stale cache
               });
               // Load cleaners from Supabase
               getTeamCleaners(u.id).then(function(dbCleaners){
                 if(dbCleaners&&dbCleaners.length>0){
-                  // Merge with demo cleaners
-                  var demoIds=INIT_CLEANERS.map(function(c){return c.email;});
-                  var realOnly=dbCleaners.filter(function(c){return demoIds.indexOf(c.email)<0;});
+                  var demoEmails=INIT_CLEANERS.map(function(c){return c.email;});
+                  var realOnly=dbCleaners.filter(function(c){return demoEmails.indexOf(c.email)<0;});
                   setCleaners(INIT_CLEANERS.concat(realOnly.map(function(c){
                     return Object.assign({},c,{
                       avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
@@ -9736,24 +9735,35 @@ export default function App() {
                     });
                   })));
                 } else {
-                  try{
-                    var cStored=localStorage.getItem("turnready_cleaners");
-                    if(cStored){var cp=JSON.parse(cStored);var initIds=INIT_CLEANERS.map(function(c){return c.id;});var extra=cp.filter(function(c){return initIds.indexOf(c.id)<0;});setCleaners(INIT_CLEANERS.concat(extra));return;}
-                  }catch(e){}
                   setCleaners(INIT_CLEANERS);
                 }
               }).catch(function(){setCleaners(INIT_CLEANERS);});
-              // Load jobs
-              try{
-                var sharedJobs=localStorage.getItem("turnready_shared_jobs");
-                if(sharedJobs){var sj=JSON.parse(sharedJobs);if(sj&&sj.length){setJobs(sj);}else setJobs(u.id==="mgr1"?INIT_JOBS:[]);}
-                else{
-                  var savedMgrData=localStorage.getItem("turnready_mgr_"+u.id);
-                  if(savedMgrData){var sd=JSON.parse(savedMgrData);if(sd.jobs&&sd.jobs.length){setJobs(sd.jobs);}else setJobs(u.id==="mgr1"?INIT_JOBS:[]);}
-                  else setJobs(u.id==="mgr1"?INIT_JOBS:[]);
+              // Load jobs from Supabase
+              getJobs({}).then(function(dbJobs){
+                if(dbJobs&&dbJobs.length>0){
+                  var mappedJobs=dbJobs.map(function(j){
+                    return Object.assign({},j,{
+                      dbId:j.id,id:j.id,propertyId:j.property_id,
+                      propertyName:j.property_name,cleanerId:j.cleaner_id,
+                      completedAt:j.completed_at,paidAt:j.paid_at,startedAt:j.started_at,
+                      rejectReason:j.rejection_reason,
+                      durationStr:j.duration_seconds?Math.floor(j.duration_seconds/3600)+"h "+Math.floor((j.duration_seconds%3600)/60)+"m":"",
+                      tasks:j.tasks||[],inventory:j.inventory||[],uploads:j.uploads||[],
+                    });
+                  });
+                  setJobs(mappedJobs);
                 }
-                try{var sharedRem=localStorage.getItem("turnready_shared_removals");if(sharedRem){var sr=JSON.parse(sharedRem);if(sr&&sr.length)setPendingRemovals(sr);}}catch(e){}
-              }catch(e){setJobs(u.id==="mgr1"?INIT_JOBS:[]);}
+              }).catch(function(e){console.error("Login getJobs failed:",e&&e.message);});
+              try{var sharedRem=localStorage.getItem("turnready_shared_removals");if(sharedRem){var sr=JSON.parse(sharedRem);if(sr&&sr.length)setPendingRemovals(sr);}}catch(e){}
+              // New manager with no data - show policy template
+              if(!u.id||isNew){
+                setManagerPolicy(TEMPLATE_POLICIES);
+              }
+            } else if(u.role==="manager"){
+              // Demo manager (mgr1) - use INIT_PROPS
+              setProps(INIT_PROPS);
+              setCleaners(INIT_CLEANERS);
+              setJobs(INIT_JOBS);
             }
             // New manager - trigger Stripe setup if not connected
             if(u.role==="manager"&&isNew&&(!u.stripeBusinessStatus||u.stripeBusinessStatus==="not_connected")){
