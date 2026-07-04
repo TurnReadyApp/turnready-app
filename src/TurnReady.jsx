@@ -1754,22 +1754,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                 var file=e.target.files[0];
                 if(!file)return;
                 var reader=new FileReader();
-                reader.onload=function(ev){
-                  var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(ex){}
-                  compressImage(ev.target.result,1200,800,0.8,function(compressed){
-                    if(isReal&&prop.id&&prop.id.includes("-")){
-                      uploadImageToStorage("property-media","properties/"+prop.id+"/cover-"+Date.now()+".jpg",compressed).then(function(url){
-                        setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:url});});});
-                        updateProperty(prop.id,{photo:url}).catch(function(e){console.error("Cover photo save:",e.message);});
-                      }).catch(function(){
-                        // Storage failed — keep base64 in state for display only
-                        setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
-                      });
-                    } else {
-                      setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
-                    }
-                  });
-                };
+                reader.onload=ev=>setProps(ps=>ps.map(pp=>pp.id!==prop.id?pp:{...pp,photo:ev.target.result}));
                 reader.readAsDataURL(file);
               }}/>
           </label>
@@ -1872,6 +1857,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
             </div>
           )}
           <div className="prog-bar" style={{marginBottom:16}}><div className="prog-fill" style={{width:(propPct)+"%"}}/></div>
+          <div style={{overflowY:"auto",maxHeight:"calc(100vh - 340px)",WebkitOverflowScrolling:"touch",paddingRight:2}}>
           {sections.map(function(sec){return(
             <div key={sec} style={{marginBottom:8}}>
               {editSecName===sec?(
@@ -2018,6 +2004,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
               style={{background:"none",border:"1px dashed #333",borderRadius:6,color:"#555",fontSize:11,
               cursor:"pointer",padding:"6px 12px",marginTop:8,width:"100%"}}>+ Add new section</button>
           )}
+          </div>
         </div>
       )}
 
@@ -2537,7 +2524,6 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     if(isReal&&prop.id&&prop.id.includes("-")){
                       uploadImageToStorage("property-media","properties/"+prop.id+"/cover-"+Date.now()+".jpg",compressed).then(function(url){
                         setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:url});});});
-                        updateProperty(prop.id,{photo:url}).catch(function(e){console.error("Cover photo save:",e.message);});
                       }).catch(function(){
                         setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
                       });
@@ -2556,7 +2542,6 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     if(isReal&&prop.id&&prop.id.includes("-")){
                       uploadImageToStorage("property-media","properties/"+prop.id+"/cover-"+Date.now()+".jpg",compressed).then(function(url){
                         setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:url});});});
-                        updateProperty(prop.id,{photo:url}).catch(function(e){console.error("Cover photo save:",e.message);});
                       }).catch(function(){
                         setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{photo:compressed});});});
                       });
@@ -5924,6 +5909,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
 
         {activeTab==="tasks"&&(
           <div className="card" style={{marginBottom:14}}>
+            <div style={{overflowY:"auto",maxHeight:"calc(100vh - 320px)",WebkitOverflowScrolling:"touch",paddingRight:2}}>
             {sections.map(function(sec){
               return(
                 <div key={sec} style={{marginBottom:8}}>
@@ -5946,6 +5932,7 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
               );
             })}
             {!started&&<div style={{fontSize:11,color:C.muted,textAlign:"center",paddingTop:8}}>Start the job to check off tasks</div>}
+            </div>
           </div>
         )}
 
@@ -6882,10 +6869,9 @@ function Messages({user,cleaners,addNotification}){
   const [input,setInput]=useState("");
   const [mediaPreview,setMediaPreview]=useState(null); // {url, type:'image'|'video', name}
 
-  // Real managers: show only real cleaners (UUID ids) — filter out demo Maria/James/Priya (c1/c2/c3)
-  var _rmgr=user&&user.id&&user.id.includes("-");
+  // List to show: manager sees all cleaners + broadcast option; cleaner sees only manager
   var contactList=isManager
-    ?(_rmgr?cleaners.filter(function(c){return c.id&&c.id.includes("-");}):cleaners)
+    ?cleaners
     :[{id:"mgr1",name:"Harvey Johnson",avatar:"HJ",role:"manager",email:"manager@turnready.app"}];
 
   // Load messages from Supabase when contact is selected
@@ -9177,20 +9163,11 @@ export default function App() {
       var allKeys=Object.keys(localStorage);
       allKeys.forEach(function(k){
         if(k.startsWith("tr_props_")||k.startsWith("turnready_shared_props")||k.startsWith("turnready_mgr_")){
+          // Only clear if it contains base64 video data (large)
           var val=localStorage.getItem(k);
           if(val&&val.length>500000){localStorage.removeItem(k);}
         }
       });
-    }catch(e){}
-    // Real users: delete ALL prop caches on startup — Supabase is the only source of truth.
-    try{
-      var _isR=localStorage.getItem("turnready_is_real_user");
-      if(_isR==="true"){
-        localStorage.removeItem("turnready_shared_props");
-        Object.keys(localStorage).forEach(function(k){
-          if(k.startsWith("tr_props_")||k.startsWith("turnready_mgr_"))localStorage.removeItem(k);
-        });
-      }
     }catch(e){}
     getCurrentUser().then(function(profile){
       if(profile){
@@ -9251,33 +9228,60 @@ export default function App() {
               setJobs(mappedJobs);
             }
           }).catch(function(e){console.error("Jobs load failed:",e.message);});
-          // Load properties from Supabase ONLY — never pre-load from localStorage cache.
-          // tasks/rooms/inventory always [] here; load lazily via getPropertyFull when property is opened.
-          // _fullLoaded always false so getPropertyFull runs every time.
+          // Load properties - show cache IMMEDIATELY, then refresh from Supabase
+          try{
+            var cachedProps=localStorage.getItem("tr_props_"+profile.id);
+            if(cachedProps){var cp=JSON.parse(cachedProps);if(cp&&cp.length)setProps(cp);}
+          }catch(e){}
           getProperties(profile.id).then(function(dbProps){
-            var _mp=(dbProps||[]).map(function(p){
-              return Object.assign({},p,{
-                schedule:p.schedule||[],tasks:[],rooms:[],inventory:[],_fullLoaded:false,
-                checkIn:p.checkIn||p.check_in||"4:00 PM",checkOut:p.checkOut||p.check_out||"11:00 AM",
-                sameDay:p.sameDay||p.same_day||false,accessCode:p.accessCode||p.access_code||"",
-                supplyInfo:p.supplyInfo||p.supply_info||"",alarmCode:p.alarmCode||p.alarm_code||"",
-                linenRate:p.linenRate||p.linen_rate||10,linenBags:p.linenBags||p.linen_bags||0,
-                totalBeds:p.totalBeds||p.total_beds||1,assignedTo:p.assignedTo||p.assigned_to||null,
+            if(dbProps&&dbProps.length>0){
+              var mapped=dbProps.map(function(p){
+                return Object.assign({},p,{
+                  schedule:p.schedule||[],
+                  tasks:p.tasks||[],
+                  rooms:p.rooms||[],
+                  inventory:p.inventory||[],
+                  checkIn:p.check_in||"4:00 PM",
+                  checkOut:p.check_out||"11:00 AM",
+                  sameDay:p.same_day||false,
+                  accessCode:p.access_code||"",
+                  supplyInfo:p.supply_info||"",
+                  alarmCode:p.alarm_code||"",
+                  linenRate:p.linen_rate||10,
+                  linenBags:p.linen_bags||0,
+                  totalBeds:p.total_beds||1,
+                  assignedTo:p.assigned_to||null,
+                });
               });
-            });
-            setProps(_mp);
-            console.log("[TurnReady] Session restore: loaded",_mp.length,"properties from Supabase");
-          }).catch(function(e){console.error("[TurnReady] Session restore failed:",e&&e.message);});
-          // Real users: load real cleaners only — never inject demo Maria/James/Priya
+              setProps(mapped);
+            } else {
+              try{
+                var stored=localStorage.getItem("turnready_shared_props");
+                if(stored){var sp=JSON.parse(stored);if(sp&&sp.length)setProps(sp);}
+              }catch(e){}
+            }
+          }).catch(function(){
+            try{
+              var fb=localStorage.getItem("turnready_shared_props");
+              if(fb){var fp=JSON.parse(fb);if(fp&&fp.length)setProps(fp);}
+            }catch(e){}
+          });
+          // Load cleaners
           getTeamCleaners(profile.id).then(function(dbCleaners){
-            var _de=INIT_CLEANERS.map(function(c){return c.email;});
-            var _rc=(dbCleaners||[]).filter(function(c){return _de.indexOf(c.email)<0;});
-            setCleaners(_rc.map(function(c){return Object.assign({},c,{
-              avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
-              totalEarned:c.total_earned||0,jobsCompleted:c.jobs_completed||0,
-              stripeStatus:c.stripe_status||"pending",joinedAt:c.joined_at||new Date().toISOString(),
-            });}));
-          }).catch(function(){setCleaners([]);});
+            if(dbCleaners&&dbCleaners.length>0){
+              var demoEmails=INIT_CLEANERS.map(function(c){return c.email;});
+              var realOnly=dbCleaners.filter(function(c){return demoEmails.indexOf(c.email)<0;});
+              setCleaners(INIT_CLEANERS.concat(realOnly.map(function(c){
+                return Object.assign({},c,{
+                  avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
+                  totalEarned:c.total_earned||0,
+                  jobsCompleted:c.jobs_completed||0,
+                  stripeStatus:c.stripe_status||"pending",
+                  joinedAt:c.joined_at||new Date().toISOString(),
+                });
+              })));
+            }
+          }).catch(function(){});
         }
       }
       setAuthLoading(false);
@@ -9387,60 +9391,77 @@ export default function App() {
     if(propsSyncTimer.current)clearTimeout(propsSyncTimer.current);
     propsSyncTimer.current=setTimeout(function(){
       props.forEach(function(p){
-        if(!p.id||!p.id.includes("-"))return;
+        // Only sync props that have a UUID-style id (real Supabase props, not demo p1/p2/p3)
+        if(!p.id||!p.id.includes("-"))return; // Only sync real Supabase UUIDs (contain dashes like "abc-def-...")
+        // Strip large base64 videos from rooms before syncing (keep photos only, compress separately)
         var roomsForSync=(p.rooms||[]).map(function(r){
           return Object.assign({},r,{
+            // If video is a Storage URL (https://), keep it as-is
+            // If video is base64 and under 8MB, keep it
+            // If video is base64 and over 8MB (huge), strip it
             video: r.video?(r.video.startsWith("http")?r.video:(r.video.length<10000000?r.video:null)):null,
             preVideo: r.preVideo?(r.preVideo.startsWith("http")?r.preVideo:(r.preVideo.length<10000000?r.preVideo:null)):null,
             refVideo: r.refVideo?(r.refVideo.startsWith("http")?r.refVideo:(r.refVideo.length<10000000?r.refVideo:null)):null,
+            // Strip object URLs (blob:) - these are temporary preview URLs
             videoUploading: false,
             refVideoUploading: false,
           });
         });
-        // Build sync payload — never include photo unless it's a Storage URL.
-        // Syncing undefined/base64 as photo was overwriting DB value with null.
-        var _sp={
-          name:p.name,address:p.address,type:p.type,pay:p.pay,bedrooms:p.bedrooms,bathrooms:p.bathrooms,
-          notes:p.notes,checkIn:p.checkIn||p.check_in,checkOut:p.checkOut||p.check_out,
-          sameDay:p.sameDay||p.same_day,accessCode:p.accessCode||p.access_code,
-          supplyInfo:p.supplyInfo||p.supply_info,alarmCode:p.alarmCode||p.alarm_code,
-          linenRate:p.linenRate||p.linen_rate,totalBeds:p.totalBeds||p.total_beds,
-          schedule:p.schedule,linenBags:p.linenBags,assignedTo:p.assignedTo,guest_rating:p.guestRating,
+        updateProperty(p.id,{
+          // Metadata only in auto-sync (fast, no large base64 payloads)
+          name:p.name,
+          address:p.address,
+          type:p.type,
+          pay:p.pay,
+          bedrooms:p.bedrooms,
+          bathrooms:p.bathrooms,
+          // Cover photo: sync Storage URLs; skip base64 (too large) and undefined
+          photo:p.photo?(p.photo.startsWith("http")?p.photo:undefined):undefined,
+          notes:p.notes,
+          checkIn:p.checkIn||p.check_in,
+          checkOut:p.checkOut||p.check_out,
+          sameDay:p.sameDay||p.same_day,
+          accessCode:p.accessCode||p.access_code,
+          supplyInfo:p.supplyInfo||p.supply_info,
+          alarmCode:p.alarmCode||p.alarm_code,
+          linenRate:p.linenRate||p.linen_rate,
+          totalBeds:p.totalBeds||p.total_beds,
+          schedule:p.schedule, // Schedule is small - always sync
+          linenBags:p.linenBags,
+          assignedTo:p.assignedTo,
+          guest_rating:p.guestRating,
+          // JSONB blobs (tasks/rooms/inventory) - sync only if they have Storage URLs (not base64)
+          tasks:p.tasks,
+          rooms:roomsForSync, // roomsForSync already strips large base64 videos
+          inventory:p.inventory,
           cleanerPhotos:(p.cleanerPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
           linenBagPhotos:(p.linenBagPhotos||[]).filter(function(ph){return ph&&ph.startsWith("http");}),
           cleanerNotes:p.cleanerNotes,
-        };
-        // Only include photo if it is a real Storage URL
-        if(p.photo&&p.photo.startsWith("http"))_sp.photo=p.photo;
-        // CRITICAL: Only write tasks/rooms/inventory when _fullLoaded is true.
-        // When false, p.tasks/rooms/inventory are [] (lazy-load placeholders from getProperties).
-        // Writing [] would permanently erase the real data saved in Supabase.
-        if(p._fullLoaded){
-          _sp.tasks=p.tasks;
-          _sp.rooms=roomsForSync;
-          _sp.inventory=p.inventory;
-        }
-        updateProperty(p.id,_sp).catch(function(e){
+        }).catch(function(e){
           console.error("❌ Supabase sync failed for property",p.id,"Error:",e.message,"Code:",e.code);
         });
       });
     },800);
   },[props]);
 
-  // Persist manager data — demo accounts only. Real users: Supabase is source of truth.
+  // Persist manager-specific data when they make changes
   useEffect(function(){
     if(!user||user.role!=="manager")return;
-    var _pr=false;try{_pr=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
-    if(_pr){try{localStorage.setItem("turnready_notifs_"+user.id,JSON.stringify(notifications.slice(0,50)));}catch(e){}return;}
-    try{localStorage.setItem("turnready_mgr_"+user.id,JSON.stringify({props:props,cleaners:cleaners,jobs:jobs,notifications:notifications.slice(0,50)}));}catch(e){}
-  },[props,cleaners,jobs,notifications,user]);
+    try{
+      localStorage.setItem("turnready_mgr_"+user.id,JSON.stringify({
+        props:props,
+        cleaners:cleaners,
+        jobs:jobs,
+        notifications:notifications.slice(0,50),
+      }));
+    }catch(e){}
+  },[props,cleaners,jobs,user]);
 
-  // Persist jobs/removals. Real users: NEVER cache props — Supabase is source of truth.
+  // Always save props, jobs, and pendingRemovals to shared key so cleaner changes persist for manager
   useEffect(function(){
     if(!user)return;
-    var _rr=false;try{_rr=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
     try{
-      if(!_rr)localStorage.setItem("turnready_shared_props",JSON.stringify(props));
+      localStorage.setItem("turnready_shared_props",JSON.stringify(props));
       localStorage.setItem("turnready_shared_jobs",JSON.stringify(jobs));
       localStorage.setItem("turnready_shared_removals",JSON.stringify(pendingRemovals));
     }catch(e){}
@@ -9544,11 +9565,16 @@ export default function App() {
     return function(){clearInterval(interval);};
   },[props,cleaners,notifications,availability]);
 
-  // Persist cleaners — demo accounts only. Real users always reload from Supabase.
+  // Persist cleaners to localStorage
   useEffect(function(){
-    var _rc=false;try{_rc=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
-    if(_rc)return;
-    try{var initIds=INIT_CLEANERS.map(function(c){return c.id;});var extra=cleaners.filter(function(c){return initIds.indexOf(c.id)<0;});if(extra.length>0)localStorage.setItem("turnready_cleaners",JSON.stringify(cleaners));}catch(e){}
+    try{
+      // Only save non-init cleaners to avoid bloat
+      var initIds=INIT_CLEANERS.map(function(c){return c.id;});
+      var extra=cleaners.filter(function(c){return initIds.indexOf(c.id)<0;});
+      if(extra.length>0){
+        localStorage.setItem("turnready_cleaners",JSON.stringify(cleaners));
+      }
+    }catch(e){}
   },[cleaners]);
 
   // Request push permission on load
@@ -9649,43 +9675,108 @@ export default function App() {
             setUser(u);
             if(u.role==="cleaner")setView("Home");
             if(u.role==="manager")setView("Dashboard");
-            // Real managers: always load from Supabase — never from localStorage cache.
+            // New manager gets clean slate
             if(u.role==="manager"&&u.id!=="mgr1"){
-              setProps([]);setCleaners([]);setJobs([]);setNotifications([]);
-              getProperties(u.id).then(function(dbProps){
-                var _lm=(dbProps||[]).map(function(p){return Object.assign({},p,{
-                  schedule:p.schedule||[],tasks:[],rooms:[],inventory:[],_fullLoaded:false,
-                  checkIn:p.checkIn||p.check_in||"4:00 PM",checkOut:p.checkOut||p.check_out||"11:00 AM",
-                  sameDay:p.sameDay||p.same_day||false,accessCode:p.accessCode||p.access_code||"",
-                  supplyInfo:p.supplyInfo||p.supply_info||"",alarmCode:p.alarmCode||p.alarm_code||"",
-                  linenRate:p.linenRate||p.linen_rate||10,linenBags:p.linenBags||p.linen_bags||0,
-                  totalBeds:p.totalBeds||p.total_beds||1,assignedTo:p.assignedTo||p.assigned_to||null,
-                });});
-                setProps(_lm);
-                if(_lm.length===0)setManagerPolicy(TEMPLATE_POLICIES);
-                console.log("[TurnReady] Login: loaded",_lm.length,"properties from Supabase");
-              }).catch(function(e){console.error("[TurnReady] Login getProperties failed:",e&&e.message);});
-              getTeamCleaners(u.id).then(function(dbCleaners){
-                var _de=INIT_CLEANERS.map(function(c){return c.email;});
-                var _rc=(dbCleaners||[]).filter(function(c){return _de.indexOf(c.email)<0;});
-                setCleaners(_rc.map(function(c){return Object.assign({},c,{
-                  avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
-                  totalEarned:c.total_earned||0,jobsCompleted:c.jobs_completed||0,
-                  stripeStatus:c.stripe_status||"pending",joinedAt:c.joined_at||new Date().toISOString(),
-                });}));
-              }).catch(function(){setCleaners([]);});
-              getJobs({}).then(function(dbJobs){
-                if(dbJobs&&dbJobs.length>0)setJobs(dbJobs.map(function(j){return Object.assign({},j,{
-                  dbId:j.id,id:j.id,propertyId:j.property_id,propertyName:j.property_name,
-                  cleanerId:j.cleaner_id,completedAt:j.completed_at,paidAt:j.paid_at,startedAt:j.started_at,
-                  rejectReason:j.rejection_reason,
-                  durationStr:j.duration_seconds?Math.floor(j.duration_seconds/3600)+"h "+Math.floor((j.duration_seconds%3600)/60)+"m":"",
-                  tasks:j.tasks||[],inventory:j.inventory||[],uploads:j.uploads||[],
-                });}));
-              }).catch(function(e){console.error("[TurnReady] Login getJobs failed:",e&&e.message);});
-              try{var _rem=localStorage.getItem("turnready_shared_removals");if(_rem){var _rp=JSON.parse(_rem);if(_rp&&_rp.length)setPendingRemovals(_rp);}}catch(e){}
+              // Load this manager's data from localStorage or start fresh
+              try{
+                var mgrData=localStorage.getItem("turnready_mgr_"+u.id);
+                if(mgrData){
+                  var d=JSON.parse(mgrData);
+                  if(d.props)setProps(d.props);
+                  else setProps([]);
+                  if(d.cleaners)setCleaners(d.cleaners);
+                  else setCleaners([]);
+                  if(d.jobs)setJobs(d.jobs);
+                  else setJobs([]);
+                  if(d.notifications)setNotifications(d.notifications);
+                  else setNotifications([]);
+                } else {
+                  // Brand new manager - empty everything
+                  setProps([]);
+                  setCleaners([]);
+                  setJobs([]);
+                  setNotifications([]);
+                  setPendingCleaners([]);
+                  setManagerPolicy(TEMPLATE_POLICIES);
+                }
+              }catch(e){
+                setProps([]);setCleaners([]);setJobs([]);setNotifications([]);
+              }
             } else if(u.role==="manager"){
-              setProps(INIT_PROPS);setCleaners(INIT_CLEANERS);setJobs(INIT_JOBS);
+              // Load from Supabase first, fall back to localStorage/demo data
+              getProperties(u.id).then(function(dbProps){
+                if(dbProps&&dbProps.length>0){
+                  // Map Supabase column names to app field names
+                  var mapped=dbProps.map(function(p){
+                    return Object.assign({},p,{
+                      schedule:p.schedule||[],
+                      tasks:p.tasks||[],
+                      rooms:p.rooms||[],
+                      inventory:p.inventory||[],
+                      checkIn:p.check_in||"4:00 PM",
+                      checkOut:p.check_out||"11:00 AM",
+                      sameDay:p.same_day||false,
+                      accessCode:p.access_code||"",
+                      supplyInfo:p.supply_info||"",
+                      alarmCode:p.alarm_code||"",
+                      linenRate:p.linen_rate||10,
+                      totalBeds:p.total_beds||1,
+                      assignedTo:p.assigned_to||null,
+                    });
+                  });
+                  setProps(mapped);
+                } else {
+                  // No Supabase data yet - use localStorage or demo
+                  try{
+                    var stored=localStorage.getItem("turnready_shared_props");
+                    if(stored){var sp=JSON.parse(stored);if(sp&&sp.length){setProps(sp);return;}}
+                    var mgrStored=localStorage.getItem("turnready_mgr_"+u.id);
+                    if(mgrStored){var md=JSON.parse(mgrStored);if(md.props&&md.props.length){setProps(md.props);return;}}
+                  }catch(e){}
+                  setProps(u.id==="mgr1"?INIT_PROPS:[]);
+                }
+              }).catch(function(){
+                // Fall back to localStorage on Supabase error
+                try{
+                  var fb=localStorage.getItem("turnready_shared_props");
+                  if(fb){var fp=JSON.parse(fb);if(fp&&fp.length){setProps(fp);return;}}
+                }catch(e){}
+                setProps(u.id==="mgr1"?INIT_PROPS:[]);
+              });
+              // Load cleaners from Supabase
+              getTeamCleaners(u.id).then(function(dbCleaners){
+                if(dbCleaners&&dbCleaners.length>0){
+                  // Merge with demo cleaners
+                  var demoIds=INIT_CLEANERS.map(function(c){return c.email;});
+                  var realOnly=dbCleaners.filter(function(c){return demoIds.indexOf(c.email)<0;});
+                  setCleaners(INIT_CLEANERS.concat(realOnly.map(function(c){
+                    return Object.assign({},c,{
+                      avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
+                      totalEarned:c.total_earned||0,
+                      jobsCompleted:c.jobs_completed||0,
+                      stripeStatus:c.stripe_status||"pending",
+                      joinedAt:c.joined_at||new Date().toISOString(),
+                    });
+                  })));
+                } else {
+                  try{
+                    var cStored=localStorage.getItem("turnready_cleaners");
+                    if(cStored){var cp=JSON.parse(cStored);var initIds=INIT_CLEANERS.map(function(c){return c.id;});var extra=cp.filter(function(c){return initIds.indexOf(c.id)<0;});setCleaners(INIT_CLEANERS.concat(extra));return;}
+                  }catch(e){}
+                  setCleaners(INIT_CLEANERS);
+                }
+              }).catch(function(){setCleaners(INIT_CLEANERS);});
+              // Load jobs
+              try{
+                var sharedJobs=localStorage.getItem("turnready_shared_jobs");
+                if(sharedJobs){var sj=JSON.parse(sharedJobs);if(sj&&sj.length){setJobs(sj);}else setJobs(u.id==="mgr1"?INIT_JOBS:[]);}
+                else{
+                  var savedMgrData=localStorage.getItem("turnready_mgr_"+u.id);
+                  if(savedMgrData){var sd=JSON.parse(savedMgrData);if(sd.jobs&&sd.jobs.length){setJobs(sd.jobs);}else setJobs(u.id==="mgr1"?INIT_JOBS:[]);}
+                  else setJobs(u.id==="mgr1"?INIT_JOBS:[]);
+                }
+                try{var sharedRem=localStorage.getItem("turnready_shared_removals");if(sharedRem){var sr=JSON.parse(sharedRem);if(sr&&sr.length)setPendingRemovals(sr);}}catch(e){}
+              }catch(e){setJobs(u.id==="mgr1"?INIT_JOBS:[]);}
             }
             // New manager - trigger Stripe setup if not connected
             if(u.role==="manager"&&isNew&&(!u.stripeBusinessStatus||u.stripeBusinessStatus==="not_connected")){
