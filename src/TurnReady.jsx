@@ -9159,22 +9159,21 @@ export default function App() {
       var allKeys=Object.keys(localStorage);
       allKeys.forEach(function(k){
         if(k.startsWith("tr_props_")||k.startsWith("turnready_shared_props")||k.startsWith("turnready_mgr_")){
-          // Only clear if it contains base64 video data (large)
           var val=localStorage.getItem(k);
           if(val&&val.length>500000){localStorage.removeItem(k);}
         }
       });
     }catch(e){}
-    // For real users: clear the prop caches entirely so stale data never overwrites Supabase
-    // Props always reload from Supabase; localStorage is not the source of truth for real users
+    // For real users: wipe ALL prop caches on every startup.
+    // Props are always reloaded fresh from Supabase - localStorage is never the source of truth.
+    // This prevents stale _fullLoaded flags and empty task/room/inventory arrays poisoning state.
     try{
       var isRealFlag=localStorage.getItem("turnready_is_real_user");
       if(isRealFlag==="true"){
         localStorage.removeItem("turnready_shared_props");
-        // Also clear any tr_props_* per-manager caches
-        var keys=Object.keys(localStorage);
-        keys.forEach(function(k){
-          if(k.startsWith("tr_props_"))localStorage.removeItem(k);
+        var keysToNuke=Object.keys(localStorage);
+        keysToNuke.forEach(function(k){
+          if(k.startsWith("tr_props_")||k.startsWith("turnready_mgr_"))localStorage.removeItem(k);
         });
       }
     }catch(e){}
@@ -9237,16 +9236,17 @@ export default function App() {
               setJobs(mappedJobs);
             }
           }).catch(function(e){console.error("Jobs load failed:",e.message);});
-          // Load properties from Supabase (no localStorage cache - avoids stale _fullLoaded flags)
+          // Load properties fresh from Supabase - never pre-load from localStorage cache.
+          // tasks/rooms/inventory are always [] here; they load lazily via getPropertyFull
+          // when a property is opened. _fullLoaded is always false so getPropertyFull always runs.
           getProperties(profile.id).then(function(dbProps){
-            // Real users always load from Supabase - never localStorage (avoids stale _fullLoaded flags)
             var mapped=(dbProps||[]).map(function(p){
               return Object.assign({},p,{
                 schedule:p.schedule||[],
-                tasks:[],      // Always start empty - loaded lazily by getPropertyFull when property is opened
-                rooms:[],      // Always start empty - loaded lazily
-                inventory:[],  // Always start empty - loaded lazily
-                _fullLoaded:false, // Always reset - force fresh load from Supabase
+                tasks:[],
+                rooms:[],
+                inventory:[],
+                _fullLoaded:false,
                 checkIn:p.checkIn||p.check_in||"4:00 PM",
                 checkOut:p.checkOut||p.check_out||"11:00 AM",
                 sameDay:p.sameDay||p.same_day||false,
@@ -9262,7 +9262,6 @@ export default function App() {
             setProps(mapped);
           }).catch(function(e){
             console.error("getProperties failed on session restore:",e&&e.message);
-            // On error, leave props empty - better than showing stale data
           });
           // Load cleaners
           getTeamCleaners(profile.id).then(function(dbCleaners){
@@ -9443,15 +9442,14 @@ export default function App() {
   },[props]);
 
   // Persist manager-specific data when they make changes
-  // NOTE: Real users (Supabase) do NOT cache props in localStorage - causes stale data on refresh
+  // Real users: NEVER cache props in localStorage - Supabase is source of truth.
+  // Caching props caused stale _fullLoaded flags and empty arrays to overwrite fresh DB data on refresh.
   useEffect(function(){
     if(!user||user.role!=="manager")return;
     var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
     if(isReal){
-      // For real users: only persist jobs and notifications (not props - those live in Supabase)
-      try{
-        localStorage.setItem("turnready_mgr_notifs_"+user.id,JSON.stringify(notifications.slice(0,50)));
-      }catch(e){}
+      // Real users: only persist notifications (never props, jobs handled by Supabase)
+      try{localStorage.setItem("turnready_notifs_"+user.id,JSON.stringify(notifications.slice(0,50)));}catch(e){}
       return;
     }
     // Demo users: persist everything as before
@@ -9465,14 +9463,15 @@ export default function App() {
     }catch(e){}
   },[props,cleaners,jobs,notifications,user]);
 
-  // Persist jobs and removals for cross-session continuity
-  // NOTE: Props are NOT persisted to localStorage for real users - Supabase is source of truth
+  // Persist jobs and removals for cross-session continuity.
+  // Real users: props are NOT written to localStorage - Supabase is always source of truth.
+  // Writing props caused the refresh bug: stale empty-array version overwrote fresh Supabase data.
   useEffect(function(){
     if(!user)return;
     var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
     try{
       if(!isReal){
-        // Demo users: cache props for offline use
+        // Demo users only: cache props for offline fallback
         localStorage.setItem("turnready_shared_props",JSON.stringify(props));
       }
       localStorage.setItem("turnready_shared_jobs",JSON.stringify(jobs));
@@ -9688,21 +9687,23 @@ export default function App() {
             setUser(u);
             if(u.role==="cleaner")setView("Home");
             if(u.role==="manager")setView("Dashboard");
-            // Real managers: always load fresh from Supabase (never localStorage for props)
+            // Real managers (non-demo): always load from Supabase, never from localStorage cache.
+            // localStorage caches caused properties to vanish on refresh due to stale _fullLoaded
+            // flags and empty task/room/inventory arrays overwriting fresh Supabase data.
             if(u.role==="manager"&&u.id!=="mgr1"){
-              // Start with empty state, load everything from Supabase
+              // Start clean - Supabase is the source of truth for real users
               setProps([]);
-              setCleaners([]);
+              setCleaners(INIT_CLEANERS);
               setJobs([]);
-              // Load properties from Supabase - tasks/rooms/inventory load lazily when property is opened
+              // Load properties - tasks/rooms/inventory load lazily via getPropertyFull when property is opened
               getProperties(u.id).then(function(dbProps){
                 var mapped=(dbProps||[]).map(function(p){
                   return Object.assign({},p,{
                     schedule:p.schedule||[],
-                    tasks:[],      // Lazy loaded by getPropertyFull
-                    rooms:[],      // Lazy loaded by getPropertyFull
-                    inventory:[],  // Lazy loaded by getPropertyFull
-                    _fullLoaded:false, // Always reset so getPropertyFull runs fresh
+                    tasks:[],
+                    rooms:[],
+                    inventory:[],
+                    _fullLoaded:false,
                     checkIn:p.checkIn||p.check_in||"4:00 PM",
                     checkOut:p.checkOut||p.check_out||"11:00 AM",
                     sameDay:p.sameDay||p.same_day||false,
@@ -9716,9 +9717,9 @@ export default function App() {
                   });
                 });
                 setProps(mapped);
+                if(mapped.length===0)setManagerPolicy(TEMPLATE_POLICIES);
               }).catch(function(e){
                 console.error("Login getProperties failed:",e&&e.message);
-                // On Supabase error, leave props empty - don't load stale cache
               });
               // Load cleaners from Supabase
               getTeamCleaners(u.id).then(function(dbCleaners){
@@ -9734,14 +9735,12 @@ export default function App() {
                       joinedAt:c.joined_at||new Date().toISOString(),
                     });
                   })));
-                } else {
-                  setCleaners(INIT_CLEANERS);
                 }
-              }).catch(function(){setCleaners(INIT_CLEANERS);});
+              }).catch(function(){});
               // Load jobs from Supabase
               getJobs({}).then(function(dbJobs){
                 if(dbJobs&&dbJobs.length>0){
-                  var mappedJobs=dbJobs.map(function(j){
+                  setJobs(dbJobs.map(function(j){
                     return Object.assign({},j,{
                       dbId:j.id,id:j.id,propertyId:j.property_id,
                       propertyName:j.property_name,cleanerId:j.cleaner_id,
@@ -9750,17 +9749,12 @@ export default function App() {
                       durationStr:j.duration_seconds?Math.floor(j.duration_seconds/3600)+"h "+Math.floor((j.duration_seconds%3600)/60)+"m":"",
                       tasks:j.tasks||[],inventory:j.inventory||[],uploads:j.uploads||[],
                     });
-                  });
-                  setJobs(mappedJobs);
+                  }));
                 }
               }).catch(function(e){console.error("Login getJobs failed:",e&&e.message);});
               try{var sharedRem=localStorage.getItem("turnready_shared_removals");if(sharedRem){var sr=JSON.parse(sharedRem);if(sr&&sr.length)setPendingRemovals(sr);}}catch(e){}
-              // New manager with no data - show policy template
-              if(!u.id||isNew){
-                setManagerPolicy(TEMPLATE_POLICIES);
-              }
             } else if(u.role==="manager"){
-              // Demo manager (mgr1) - use INIT_PROPS
+              // Demo manager (mgr1) - use static demo data
               setProps(INIT_PROPS);
               setCleaners(INIT_CLEANERS);
               setJobs(INIT_JOBS);
