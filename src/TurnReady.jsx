@@ -3581,7 +3581,13 @@ function Cleaners({cleaners,setCleaners,jobs,pendingCleaners,setPendingCleaners,
         <div style={{fontFamily:"Arial Black,sans-serif",fontSize:14,fontWeight:900,letterSpacing:.5,color:"#CC0000",marginBottom:4}}>INVITE A CLEANER</div>
         <div style={{fontSize:12,color:"#888",marginBottom:14,lineHeight:1.6}}>Share your invite code with your cleaner. With the code they sign in instantly.</div>
         {(function(){
-          var code=(user&&(user.invite_code||user.inviteCode))||"HARVEY2024";
+          var code=user&&(user.invite_code||user.inviteCode);
+          if(!code)return(
+            <div style={{background:"#0D0D0D",border:"1px solid #2A2A2A",borderRadius:10,padding:14,marginBottom:12,textAlign:"center"}}>
+              <div style={{fontSize:11,color:"#888"}}>⏳ Generating your invite code...</div>
+              <div style={{fontSize:10,color:"#555",marginTop:6}}>Refresh in a moment if this persists.</div>
+            </div>
+          );
           return(
             <div>
               <div style={{background:"#0D0D0D",border:"1px solid #CC0000",borderRadius:10,padding:14,marginBottom:12,textAlign:"center"}}>
@@ -3603,7 +3609,7 @@ function Cleaners({cleaners,setCleaners,jobs,pendingCleaners,setPendingCleaners,
           <button onClick={()=>{if(navigator.clipboard)navigator.clipboard.writeText("app.turnready.app");setInviteCopied(true);setTimeout(()=>setInviteCopied(false),2000);}} style={{background:"#CC0000",border:"none",borderRadius:6,padding:"6px 12px",color:"#FFF",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>{inviteCopied?"✓ Copied!":"Copy Link"}</button>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <button className="btn" style={{flex:1}} onClick={()=>{var code2=(user&&(user.invite_code||user.inviteCode))||"HARVEY2024";var shareMsg="Hi! Join my cleaning team on TurnReady. Download the app at app.turnready.app and use invite code "+code2+" to sign up instantly.";if(navigator.share)navigator.share({title:"Join my TurnReady team",text:shareMsg});else if(navigator.clipboard){navigator.clipboard.writeText(shareMsg);setInviteCopied(true);setTimeout(()=>setInviteCopied(false),2000);}}}>📱 Share via Phone</button>
+          <button className="btn" style={{flex:1}} onClick={()=>{var code2=user&&(user.invite_code||user.inviteCode);if(!code2)return;var shareMsg="Hi! Join my cleaning team on TurnReady. Download the app at app.turnready.app and use invite code "+code2+" to sign up instantly.";if(navigator.share)navigator.share({title:"Join my TurnReady team",text:shareMsg});else if(navigator.clipboard){navigator.clipboard.writeText(shareMsg);setInviteCopied(true);setTimeout(()=>setInviteCopied(false),2000);}}}>📱 Share via Phone</button>
           <button className="btn ghost sm" onClick={()=>setShowInvite(false)}>Close</button>
         </div>
       </div>}
@@ -8786,7 +8792,7 @@ function Info({user,managerPolicy,setManagerPolicy}){
     {icon:"🏠",title:"Add Your Properties",body:"Go to Properties and tap '+ Add Property'. Enter the name, address, bedrooms, bathrooms, total beds (mattresses), and check-in/check-out times. Upload a cover photo and set it as Same-Day or Standard turnover. Tap the address to get directions anytime."},
     {icon:"📋",title:"Set Up Tasks & Checklist",body:"Inside each property tap Tasks. Your master checklist is already loaded with 7 sections from Arrival to Departure. Drag tasks to reorder them. Tap any section name to rename it. Add new tasks or sections as needed for that property."},
     {icon:"🏷️",title:"Set Up Rooms",body:"Tap Rooms inside a property to add each room — living room, bedrooms, bathrooms, kitchen. Add an icon, staging guide, and reference photos so cleaners know exactly how each room should look when done."},
-    {icon:"👥",title:"Build Your Team",body:"Go to Team and share your invite code (HARVEY2024) with your cleaners. Once they sign up you can assign jobs to any cleaner. View each cleaner's ratings, job history, and availability from their profile."},
+    {icon:"👥",title:"Build Your Team",body:"Go to Team and tap Invite to share your personal invite code with your cleaners. Once they sign up using your code they are instantly linked to your account and you can assign jobs to them. View each cleaner's ratings, job history, and availability from their profile."},
     {icon:"📅",title:"Assign Jobs",body:"Open a property and tap Assign. Choose a cleaner, date, and time. The cleaner gets notified immediately and has 8 hours to accept or decline. If they don\'t respond, the job auto-assigns to the next available cleaner."},
     {icon:"⚠️",title:"Handle Removal Requests",body:"If a cleaner requests to be removed from a job, you\'ll see it in Approvals under Removal Requests with their reason. Tap Approve (removes them), Deny (they must show up), or Reassign (move it to another cleaner)."},
     {icon:"✅",title:"Review & Approve Jobs",body:"When a cleaner submits, go to Approvals. Review their task checklist, inventory status, room videos, and guest rating. Tap Approve to release payment or Reject with a specific reason. Rejected jobs go back to the cleaner to fix and resubmit."},
@@ -9349,7 +9355,17 @@ export default function App() {
           businessPhone:profile.business_phone||null,
           businessAddress:profile.business_address||null,
           emergency:profile.emergency||null,
+          invite_code:profile.invite_code||null,
+          trial_start:profile.trial_start||null,
+          plan:profile.plan||"trial",
         });
+        // If this manager has no invite code yet, generate and save one now
+        if(profile.role==="manager"&&!profile.invite_code){
+          var biz=(profile.business_name||profile.name||"TURN").replace(/[^A-Za-z]/g,"").toUpperCase();
+          var generatedIC=(biz+"TURN").slice(0,4)+Math.floor(1000+Math.random()*9000);
+          mappedProfile.invite_code=generatedIC;
+          updateUserProfile(profile.id,{invite_code:generatedIC}).catch(function(e){console.error("Invite code save:",e.message);});
+        }
         setUser(mappedProfile);
         try{localStorage.setItem("turnready_session_user",JSON.stringify({id:profile.id,role:profile.role}));}catch(e){}
         if(profile.role==="cleaner")setView("Home");
@@ -9773,6 +9789,13 @@ export default function App() {
   if(authLoading) return (<div style={{minHeight:"100vh",background:"#0D0D0D",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}><style>{css}</style><div style={{fontFamily:"Arial Black,sans-serif",fontSize:22,fontWeight:900,letterSpacing:1}}><span style={{color:"#FFF"}}>TURN</span><span style={{color:"#CC0000"}}>READY</span></div><div style={{color:"#888",fontSize:13}}>Loading...</div></div>);
   if(!user) return (<div><style>{css}</style><Login onLogin={function(u,isNew,newCleaner){
             setUser(u);
+            // If real manager has no invite code, generate and save one now
+            if(u.role==="manager"&&u.id&&u.id.includes("-")&&!u.invite_code){
+              var biz2=(u.business_name||u.businessName||u.name||"TURN").replace(/[^A-Za-z]/g,"").toUpperCase();
+              var generatedIC2=(biz2+"TURN").slice(0,4)+Math.floor(1000+Math.random()*9000);
+              setUser(function(prev){return Object.assign({},prev,{invite_code:generatedIC2});});
+              updateUserProfile(u.id,{invite_code:generatedIC2}).catch(function(e){console.error("Invite code save on login:",e.message);});
+            }
             if(u.role==="cleaner")setView("Home");
             if(u.role==="manager")setView("Dashboard");
             // Real managers: always load from Supabase — never from localStorage cache.
