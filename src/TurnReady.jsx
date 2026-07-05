@@ -3273,10 +3273,36 @@ function AssignModal({prop,cleaners,availability,onAssign,onClose}){
           })()}
         </div>
 
-        {/* Time */}
+        {/* Time — custom dropdowns instead of input type=time to avoid native clock being cut off on Android */}
         <div style={{marginBottom:12}}>
           <label style={{fontSize:10,color:"#888",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Start Time</label>
-          <input type="time" value={time} onChange={function(e){setTime(e.target.value);}} style={{width:"100%",boxSizing:"border-box"}}/>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            {(function(){
+              var parts=time?time.split(":"):[11,0];
+              var h24=parseInt(parts[0])||0;
+              var mins=parseInt(parts[1])||0;
+              var ampm=h24>=12?"PM":"AM";
+              var h12=h24===0?12:h24>12?h24-12:h24;
+              function update(newH12,newAmpm,newMins){
+                var h=newH12===12?(newAmpm==="AM"?0:12):(newAmpm==="PM"?newH12+12:newH12);
+                setTime((h<10?"0"+h:h)+":"+(newMins<10?"0"+newMins:newMins));
+              }
+              var selStyle={flex:1,background:"#141414",border:"1px solid #2A2A2A",borderRadius:8,color:"#FFF",fontSize:14,padding:"10px 8px",outline:"none",cursor:"pointer",textAlign:"center"};
+              return(<>
+                <select value={h12} onChange={function(e){update(parseInt(e.target.value),ampm,mins);}} style={selStyle}>
+                  {[12,1,2,3,4,5,6,7,8,9,10,11].map(function(h){return <option key={h} value={h}>{h}</option>;})}
+                </select>
+                <span style={{color:"#555",fontWeight:700,fontSize:16,flexShrink:0}}>:</span>
+                <select value={mins} onChange={function(e){update(h12,ampm,parseInt(e.target.value));}} style={selStyle}>
+                  {[0,15,30,45].map(function(m){return <option key={m} value={m}>{m<10?"0"+m:m}</option>;})}
+                </select>
+                <select value={ampm} onChange={function(e){update(h12,e.target.value,mins);}} style={Object.assign({},selStyle,{flex:"0 0 70px",fontWeight:700,color:ampm==="AM"?"#60A5FA":"#F59E0B"})}>
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
+              </>);
+            })()}
+          </div>
         </div>
 
         {/* Primary Cleaner */}
