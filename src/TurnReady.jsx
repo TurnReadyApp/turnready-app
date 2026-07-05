@@ -1941,15 +1941,21 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
                     {t.done&&<span style={{color:"#FFF",fontSize:12,fontWeight:900}}>✓</span>}
                   </div>
-                  <input value={t.label}
-                    onChange={function(e){setProps(function(ps){return ps.map(function(pp){
-                      return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).map(function(tk){
-                        return tk.id!==t.id?tk:Object.assign({},tk,{label:e.target.value});
-                      })});
-                    });});}}
+                  <textarea value={t.label}
+                    rows={1}
+                    onChange={function(e){
+                      e.target.style.height="auto";
+                      e.target.style.height=e.target.scrollHeight+"px";
+                      setProps(function(ps){return ps.map(function(pp){
+                        return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).map(function(tk){
+                          return tk.id!==t.id?tk:Object.assign({},tk,{label:e.target.value});
+                        })});
+                      });});}}
+                    onFocus={function(e){e.target.style.height="auto";e.target.style.height=e.target.scrollHeight+"px";}}
                     style={{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",fontSize:13,
                       color:t.done?C.muted:C.white,textDecoration:t.done?"line-through":"none",
-                      fontFamily:"Inter,sans-serif",padding:0,wordBreak:"break-word",overflowWrap:"break-word"}}/>
+                      fontFamily:"Inter,sans-serif",padding:0,resize:"none",overflow:"hidden",
+                      lineHeight:"1.4",wordBreak:"break-word"}}/>
                   <button onClick={function(){setProps(function(ps){return ps.map(function(pp){
                     return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).filter(function(tk){return tk.id!==t.id;})});
                   });});}}
@@ -3063,12 +3069,11 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
     setAssignTarget(null);
   }
 
-  // Render AssignModal as overlay regardless of which view is showing
-  if(assignTarget) return(
-    <div>
-      <AssignModal prop={assignTarget} cleaners={cleaners} availability={availability} onAssign={assign} onClose={function(){setAssignTarget(null);}}/>
-    </div>
-  );
+  // Render AssignModal as a fixed overlay on top of existing UI — NOT as a page replacement.
+  // Returning early here caused a black screen because the bare <div> had no background.
+  var assignModalOverlay=assignTarget?(
+    <AssignModal prop={assignTarget} cleaners={cleaners} availability={availability} onAssign={assign} onClose={function(){setAssignTarget(null);}}/>
+  ):null;
 
   // When a property is selected, load full JSONB data from Supabase
   useEffect(function(){
@@ -3124,7 +3129,7 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
         </div>
       );
     }
-    return <ErrorBoundary><PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners} user={user}/></ErrorBoundary>;
+    return <div><ErrorBoundary><PropDetail prop={prop} cleaner={cleaners.find(c=>c.id===prop.assignedTo)} onBack={()=>setSel(null)} onAssign={()=>setAssignTarget(prop)} templates={templates} setProps={setProps} cleaners={cleaners} user={user}/></ErrorBoundary>{assignModalOverlay}</div>;
   }
 
   return(
@@ -3217,8 +3222,7 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
           </div>
         </div>
       )}
-
-
+      {assignModalOverlay}
     </div>
   );
 }
