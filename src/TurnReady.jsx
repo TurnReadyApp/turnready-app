@@ -838,6 +838,8 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
   const [phone,setPhone]=useState("");
   const [err,setErr]=useState("");
   const [signupPlan,setSignupPlan]=useState("pro");
+  const [showDemoPanel,setShowDemoPanel]=useState(false);
+  const [demoTaps,setDemoTaps]=useState(0);
 
   // Check if WebAuthn/biometric is supported
   React.useEffect(function(){
@@ -945,7 +947,11 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
 
   var badge=<div style={{textAlign:"center",marginBottom:24}}>
     <div style={{display:"inline-block",background:"#CC0000",color:"#FFF",fontSize:10,fontWeight:800,letterSpacing:2,padding:"5px 14px",borderRadius:20,marginBottom:12,fontFamily:"Inter,sans-serif"}}>🧹 PRO CLEANING APP</div>
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:0,marginBottom:8}}>
+    <div onClick={function(){
+      var next=demoTaps+1;
+      setDemoTaps(next);
+      if(next>=5){setShowDemoPanel(true);setDemoTaps(0);}
+    }} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:0,marginBottom:8,cursor:"default",userSelect:"none"}}>
       <span style={{fontFamily:"Arial Black,Impact,sans-serif",fontSize:"clamp(32px, 9vw, 60px)",fontWeight:900,letterSpacing:0,color:"#FFF",lineHeight:1}}>TURN</span>
       <span style={{fontFamily:"Arial Black,Impact,sans-serif",fontSize:"clamp(32px, 9vw, 60px)",fontWeight:900,letterSpacing:0,color:"#CC0000",lineHeight:1}}>READY</span>
     </div>
@@ -1052,23 +1058,20 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
           <div style={{textAlign:"center",marginTop:12,marginBottom:4}}>
             <button onClick={function(){setShowTosRead(true);}} style={{background:"none",border:"none",color:"#555",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Terms of Service & Privacy Policy</button>
           </div>
-          {/* Demo credentials — only visible if not a real user (for internal testing) */}
-          {(function(){
-            var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
-            if(isReal)return null;
-            return(
-              <div>
-                <div style={{height:1,background:"#2A2A2A",margin:"18px 0"}}/>
-                <div style={{background:"#141414",borderRadius:8,padding:12,border:"1px solid #222"}}>
-                  <div style={{fontSize:10,color:"#555",marginBottom:6,textTransform:"uppercase",letterSpacing:.8,fontWeight:600}}>Demo Accounts</div>
-                  <div style={{fontSize:11,color:"#555",lineHeight:2}}>
-                    <div><span style={{color:"#CC0000",fontWeight:600}}>Manager:</span> manager@turnready.app / admin123</div>
-                    <div><span style={{color:"#888"}}>Cleaner:</span> maria@turnready.app / clean123</div>
-                  </div>
+          {/* Demo credentials — hidden from all users; reveal by tapping the TurnReady logo 5x */}
+          {showDemoPanel&&(
+            <div>
+              <div style={{height:1,background:"#2A2A2A",margin:"18px 0"}}/>
+              <div style={{background:"#141414",borderRadius:8,padding:12,border:"1px solid #222",position:"relative"}}>
+                <button onClick={function(){setShowDemoPanel(false);setDemoTaps(0);}} style={{position:"absolute",top:6,right:8,background:"none",border:"none",color:"#444",fontSize:14,cursor:"pointer",lineHeight:1}}>×</button>
+                <div style={{fontSize:10,color:"#555",marginBottom:6,textTransform:"uppercase",letterSpacing:.8,fontWeight:600}}>Demo Accounts</div>
+                <div style={{fontSize:11,color:"#555",lineHeight:2}}>
+                  <div><span style={{color:"#CC0000",fontWeight:600}}>Manager:</span> manager@turnready.app / admin123</div>
+                  <div><span style={{color:"#888"}}>Cleaner:</span> maria@turnready.app / clean123</div>
                 </div>
               </div>
-            );
-          })()}
+            </div>
+          )}
         </div>}
 
         {/* Cleaner signup */}
@@ -3180,17 +3183,12 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
     var p=props.find(function(x){return x.id===sel;});
     if(!p||!p.id||!p.id.includes("-"))return;
     if(p._fullLoaded)return;
-    var t=document.createElement("div");
-    t.style.cssText="position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #4444ff;color:#8888ff;font-size:10px;padding:6px 14px;border-radius:12px;z-index:9999;";
-    t.textContent="🔵 Loading "+p.name+" from DB...";
-    document.body.appendChild(t);
     getPropertyFull(p.id).then(function(full){
       var tasks=(full&&full.tasks)||[];
       var rooms=(full&&full.rooms)||[];
       var inv=(full&&full.inventory)||[];
-      t.textContent="🔵 Got: "+tasks.length+"t "+rooms.length+"r "+inv.length+"i — updating state...";
       setProps(function(ps){
-        var updated=ps.map(function(pp){
+        return ps.map(function(pp){
           if(pp.id!==p.id)return pp;
           return Object.assign({},pp,{
             _fullLoaded:true,
@@ -3202,18 +3200,9 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
             cleanerNotes:(full&&full.cleanerNotes)||pp.cleanerNotes||"",
           });
         });
-        var found=updated.find(function(x){return x.id===p.id;});
-        setTimeout(function(){
-          t.textContent="✅ State: "+(found?found.tasks.length+"t "+found.rooms.length+"r "+found.inventory.length+"i":"NOT FOUND");
-          t.style.borderColor="#22C55E";t.style.color="#22C55E";t.style.background="#052e16";
-          setTimeout(function(){try{document.body.removeChild(t);}catch(e){}},5000);
-        },100);
-        return updated;
       });
     }).catch(function(e){
-      t.textContent="❌ "+e.message;
-      t.style.borderColor="#EF4444";t.style.color="#EF4444";
-      setTimeout(function(){try{document.body.removeChild(t);}catch(e){}},8000);
+      console.error("[TurnReady] getPropertyFull failed:",e&&e.message);
     });
   },[sel]);
 
