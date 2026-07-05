@@ -837,6 +837,7 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
   const [name2,setName2]=useState("");
   const [phone,setPhone]=useState("");
   const [err,setErr]=useState("");
+  const [signupPlan,setSignupPlan]=useState("pro");
 
   // Check if WebAuthn/biometric is supported
   React.useEffect(function(){
@@ -1051,14 +1052,23 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
           <div style={{textAlign:"center",marginTop:12,marginBottom:4}}>
             <button onClick={function(){setShowTosRead(true);}} style={{background:"none",border:"none",color:"#555",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Terms of Service & Privacy Policy</button>
           </div>
-          <div style={{height:1,background:"#2A2A2A",margin:"18px 0"}}/>
-          <div style={{background:"#141414",borderRadius:8,padding:12,border:"1px solid #222"}}>
-            <div style={{fontSize:10,color:"#555",marginBottom:6,textTransform:"uppercase",letterSpacing:.8,fontWeight:600}}>Demo Accounts</div>
-            <div style={{fontSize:11,color:"#555",lineHeight:2}}>
-              <div><span style={{color:"#CC0000",fontWeight:600}}>Manager:</span> manager@turnready.app / admin123</div>
-              <div><span style={{color:"#888"}}>Cleaner:</span> maria@turnready.app / clean123</div>
-            </div>
-          </div>
+          {/* Demo credentials — only visible if not a real user (for internal testing) */}
+          {(function(){
+            var isReal=false;try{isReal=localStorage.getItem("turnready_is_real_user")==="true";}catch(e){}
+            if(isReal)return null;
+            return(
+              <div>
+                <div style={{height:1,background:"#2A2A2A",margin:"18px 0"}}/>
+                <div style={{background:"#141414",borderRadius:8,padding:12,border:"1px solid #222"}}>
+                  <div style={{fontSize:10,color:"#555",marginBottom:6,textTransform:"uppercase",letterSpacing:.8,fontWeight:600}}>Demo Accounts</div>
+                  <div style={{fontSize:11,color:"#555",lineHeight:2}}>
+                    <div><span style={{color:"#CC0000",fontWeight:600}}>Manager:</span> manager@turnready.app / admin123</div>
+                    <div><span style={{color:"#888"}}>Cleaner:</span> maria@turnready.app / clean123</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>}
 
         {/* Cleaner signup */}
@@ -1096,14 +1106,24 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
             if(!name||!email||!phone||!pwd){setErr("Please fill in all fields.");return;}
             if(pwd.length<8){setErr("Password must be at least 8 characters.");return;}
             if(pwd!==pwd2){setErr("Passwords do not match.");return;}
-            var codeOk=inviteInput.trim().toUpperCase()===inviteCode;
             setLoading(true);setErr("");
+            var enteredCode=inviteInput.trim().toUpperCase();
             try{
+              // Look up which manager owns this invite code (supports any manager, not just Harvey)
+              var managerRecord=enteredCode?await getCleanersByInviteCode(enteredCode):null;
+              var codeOk=!!managerRecord;
+              // If code not found in DB, fall back to legacy hardcoded check
+              if(!codeOk&&enteredCode===inviteCode)codeOk=true;
               if(codeOk||inviteInput.trim()===""){
-                await signUp({email:email.trim().toLowerCase(),password:pwd,name:name.trim(),role:"cleaner",inviteCode:codeOk?inviteInput.trim().toUpperCase():null,phone:phone.trim()});
+                await signUp({email:email.trim().toLowerCase(),password:pwd,name:name.trim(),role:"cleaner",inviteCode:enteredCode||null,phone:phone.trim()});
                 if(codeOk){
                   await signIn({email:email.trim().toLowerCase(),password:pwd});
                   var profile=await getCurrentUser();
+                  // Set manager_id on this cleaner so they appear in the right manager's Team
+                  if(profile&&managerRecord&&managerRecord.id){
+                    try{await updateUserProfile(profile.id,{manager_id:managerRecord.id});}catch(ue){}
+                    profile.manager_id=managerRecord.id;
+                  }
                   setLoading(false);
                   var mp=profile?Object.assign({},profile,{
                     stripeStatus:profile.stripe_status||"pending",
@@ -1126,7 +1146,7 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
               }
             }catch(e){
               setLoading(false);
-              if(codeOk){
+              if(inviteInput.trim()!==""){
                 var av=name.trim().split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase();
                 var nc={id:"c"+Date.now(),name:name.trim(),email:email.trim().toLowerCase(),phone:phone.trim(),password:pwd,totalEarned:0,jobsCompleted:0,rating:5.0,avatar:av,role:"backup",reviews:[],joinedAt:new Date().toISOString()};
                 setCleaners(function(cs){return cs.concat([nc]);});
@@ -1139,7 +1159,6 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
           </div>
         </div>}
 
-        {/* Manager signup */}
         {mode==="manager_signup"&&<div style={{background:"#1A1A1A",border:"1px solid rgba(204,0,0,.3)",borderRadius:16,padding:28,marginBottom:14}}>
           <div style={{fontFamily:"Bebas Neue,sans-serif",fontSize:18,letterSpacing:1,color:"#CC0000",marginBottom:4}}>START YOUR BUSINESS</div>
           <div style={{fontSize:12,color:"#888",marginBottom:16,lineHeight:1.6}}>Create your manager account. 7-day free trial — no charge until day 8.</div>
@@ -1167,30 +1186,74 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
             <label style={{fontSize:11,color:"#888",fontWeight:600,letterSpacing:.8,textTransform:"uppercase"}}>Confirm Password</label>
             <input value={pwd} onChange={function(e){setPwd(e.target.value);}} placeholder="Re-enter your password" type="password" style={{marginTop:6}}/>
           </div>
+          {/* Plan selection */}
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:11,color:"#888",fontWeight:600,letterSpacing:.8,textTransform:"uppercase",display:"block",marginBottom:8}}>Choose Your Plan <span style={{color:"#CC0000",fontWeight:400}}>— Free for 7 days</span></label>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[
+                {key:"solo",label:"Solo",price:"$29/mo",desc:"1–3 properties · Up to 5 cleaners",color:"#444"},
+                {key:"pro",label:"Pro",price:"$49/mo",desc:"Up to 10 properties · Unlimited cleaners · AI assistant",color:"#CC0000",popular:true},
+                {key:"agency",label:"Agency",price:"$99/mo",desc:"Unlimited properties · Multiple managers · White label",color:"#F59E0B"},
+              ].map(function(plan){
+                var sel=(signupPlan||"pro")===plan.key;
+                return(
+                  <div key={plan.key} onClick={function(){setSignupPlan(plan.key);}}
+                    style={{padding:"12px 14px",borderRadius:10,border:"2px solid "+(sel?plan.color:"#2A2A2A"),
+                      background:sel?"rgba(204,0,0,.06)":"transparent",cursor:"pointer",
+                      display:"flex",alignItems:"center",justifyContent:"space-between",transition:"border .15s"}}>
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontFamily:"Arial Black,sans-serif",fontSize:13,fontWeight:900,color:sel?plan.color:"#FFF"}}>{plan.label}</span>
+                        {plan.popular&&<span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:10,background:"rgba(204,0,0,.2)",color:"#CC0000",border:"1px solid rgba(204,0,0,.3)"}}>MOST POPULAR</span>}
+                      </div>
+                      <div style={{fontSize:11,color:"#888",marginTop:2}}>{plan.desc}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontFamily:"Arial Black,sans-serif",fontSize:14,fontWeight:900,color:sel?plan.color:"#888"}}>{plan.price}</div>
+                      <div style={{fontSize:9,color:"#555"}}>after trial</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontSize:10,color:"#555",marginTop:8,textAlign:"center",lineHeight:1.5}}>
+              7 days free · No charge until trial ends · Cancel anytime
+            </div>
+          </div>
           {err&&<div style={{color:"#EF4444",fontSize:12,marginBottom:12}}>{err}</div>}
           <button className="btn" style={{width:"100%",padding:14,fontSize:13,marginBottom:10}} onClick={async function(){
             if(!name||!name2||!email||!pwd2){setErr("Please fill in all required fields.");return;}
             if(pwd2.length<8){setErr("Password must be at least 8 characters.");return;}
             if(pwd2!==pwd){setErr("Passwords do not match.");return;}
             setLoading(true);setErr("");
+            // Generate unique invite code: first 4 letters of business name + 4 random digits
+            var prefix=(name.trim().replace(/[^A-Za-z]/g,"").toUpperCase()+"TURN").slice(0,4);
+            var suffix=Math.floor(1000+Math.random()*9000).toString();
+            var generatedCode=prefix+suffix;
+            var chosenPlan=signupPlan||"pro";
             try{
-              await signUp({email:email.trim().toLowerCase(),password:pwd2,name:name2.trim(),role:"manager",phone:phone.trim()});
+              await signUp({email:email.trim().toLowerCase(),password:pwd2,name:name2.trim(),role:"manager",phone:phone.trim(),inviteCode:generatedCode,plan:chosenPlan});
               await signIn({email:email.trim().toLowerCase(),password:pwd2});
               var profile=await getCurrentUser();
               if(profile){
                 profile.business_name=name.trim();
                 profile.businessName=name.trim();
                 profile.stripeBusinessStatus="not_connected";
+                profile.invite_code=generatedCode;
+                profile.plan=chosenPlan;
+                profile.trial_start=profile.trial_start||new Date().toISOString();
+                // Save extra fields to Supabase
+                try{await updateUserProfile(profile.id,{business_name:name.trim(),invite_code:generatedCode,plan:chosenPlan,trial_start:profile.trial_start});}catch(ue){}
               }
               setLoading(false);
-              onLogin(profile||{id:"mgr"+Date.now(),name:name2,businessName:name,email:email.trim().toLowerCase(),role:"manager",plan:"trial",avatar:name2.split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),stripeBusinessStatus:"not_connected"},true);
+              onLogin(profile||{id:"mgr"+Date.now(),name:name2,businessName:name,email:email.trim().toLowerCase(),role:"manager",plan:chosenPlan,invite_code:generatedCode,trialStart:new Date().toISOString(),avatar:name2.split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),stripeBusinessStatus:"not_connected"},true);
             }catch(e){
               setLoading(false);
-              var newMgr={id:"mgr"+Date.now(),name:name2,businessName:name,email:email.trim().toLowerCase(),phone:phone.trim(),password:pwd2,role:"manager",plan:"trial",trialStart:new Date().toISOString(),avatar:name2.split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),stripeBusinessStatus:"not_connected"};
+              var newMgr={id:"mgr"+Date.now(),name:name2,businessName:name,email:email.trim().toLowerCase(),phone:phone.trim(),password:pwd2,role:"manager",plan:chosenPlan,invite_code:generatedCode,trialStart:new Date().toISOString(),avatar:name2.split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),stripeBusinessStatus:"not_connected"};
               onLogin(newMgr,true);
             }
           }}>{loading?"CREATING ACCOUNT...":"Start 7-Day Free Trial →"}</button>
-          <div style={{fontSize:10,color:"#555",textAlign:"center"}}>Credit card required after trial. Cancel anytime.</div>
+          <div style={{fontSize:10,color:"#555",textAlign:"center"}}>No credit card required to start. Cancel anytime.</div>
         </div>}
 
       </div>
@@ -1220,13 +1283,13 @@ function Login({onLogin,cleaners,setCleaners,pending,setPending,inviteCode}){
               <div style={{fontFamily:"Arial Black,sans-serif",fontSize:14,fontWeight:900,letterSpacing:1,marginBottom:14,color:"#CC0000"}}>TERMS OF SERVICE</div>
               <div style={{fontSize:12,color:"#CCC",lineHeight:1.8}}>
                 <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>1. Acceptance of Terms</p><p style={{marginBottom:10}}>By accessing or using TurnReady, you agree to be bound by these Terms. If you do not agree, do not use this App.</p>
-                <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>2. Use of the App</p><p style={{marginBottom:10}}>The App is for authorized users of Harvey's Professional Cleaning LLC only. You agree to use it only for lawful purposes and in accordance with company policies.</p>
+                <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>2. Use of the App</p><p style={{marginBottom:10}}>The App is for authorized users only. You agree to use it only for lawful purposes and in accordance with your organization's policies and these Terms.</p>
                 <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>3. User Responsibilities</p><p style={{marginBottom:10}}>You are responsible for maintaining the confidentiality of your login credentials and for all activity under your account.</p>
                 <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>4. Documentation and Media</p><p style={{marginBottom:10}}>Photos and videos submitted through the App are property records. You grant the company a license to use submitted media for quality assurance.</p>
-                <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>5. Independent Contractor Status</p><p style={{marginBottom:10}}>Cleaners are independent contractors, not employees. You are responsible for your own taxes, insurance, and legal compliance.</p>
-                <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>6. Limitation of Liability</p><p style={{marginBottom:10}}>Harvey's Professional Cleaning LLC is not liable for any indirect or consequential damages. The App is provided as is.</p>
+                <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>5. Independent Contractor Status</p><p style={{marginBottom:10}}>Cleaners using TurnReady are independent contractors, not employees of TurnReady or any manager using the platform. Each party is responsible for their own taxes, insurance, and legal compliance.</p>
+                <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>6. Limitation of Liability</p><p style={{marginBottom:10}}>TurnReady and its operators are not liable for any indirect or consequential damages. The App is provided as-is without warranty of any kind.</p>
                 <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>7. Termination</p><p style={{marginBottom:10}}>We reserve the right to terminate access at any time for violation of these Terms or company policies.</p>
-                <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>8. Governing Law</p><p style={{marginBottom:0}}>These Terms are governed by the laws of the State of Georgia.</p>
+                <p style={{marginBottom:10,fontWeight:700,color:"#FFF"}}>8. Governing Law</p><p style={{marginBottom:0}}>These Terms are governed by the laws of the jurisdiction in which TurnReady operates.</p>
               </div>
             </div>
             <div style={{background:"#141414",borderRadius:12,padding:20,marginBottom:24,border:"1px solid #2A2A2A"}}>
@@ -1339,7 +1402,7 @@ function Stat({label,value,color,sub}){
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function Dashboard({props,cleaners,jobs,setView,notifications,onSelectCleaner}){
+function Dashboard({props,cleaners,jobs,setView,notifications,user,onSelectCleaner}){
   var pend=jobs.filter(j=>j.status==="pending_approval").length;
   var approved=jobs.filter(j=>j.status==="approved");
   var paid=approved.reduce((s,j)=>s+j.pay,0);
@@ -1393,7 +1456,43 @@ function Dashboard({props,cleaners,jobs,setView,notifications,onSelectCleaner}){
         <div style={{color:C.muted,fontSize:11,marginTop:2}}>{today}</div>
       </div>
 
-      {/* Stat cards - 3 column grid, compact */}
+      {/* Trial banner — shown for real managers on trial plan */}
+      {(function(){
+        if(!user||!user.id||!user.id.includes("-"))return null; // skip for demo
+        var plan=user.plan||"trial";
+        var trialStart=user.trial_start||user.trialStart;
+        if(!trialStart)return null;
+        var daysUsed=Math.floor((Date.now()-new Date(trialStart).getTime())/(1000*60*60*24));
+        var daysLeft=Math.max(0,7-daysUsed);
+        if(daysLeft>7||daysUsed<0)return null; // bad data guard
+        var isExpired=daysLeft===0;
+        var isUrgent=daysLeft<=2;
+        if(daysUsed>=7&&plan!=="trial")return null; // paid plan, no banner
+        return(
+          <div style={{background:isExpired?"rgba(239,68,68,.12)":isUrgent?"rgba(245,158,11,.1)":"rgba(34,197,94,.08)",
+            border:"1px solid "+(isExpired?"rgba(239,68,68,.4)":isUrgent?"rgba(245,158,11,.35)":"rgba(34,197,94,.25)"),
+            borderRadius:10,padding:"10px 14px",marginBottom:14,
+            display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:isExpired?"#EF4444":isUrgent?"#F59E0B":"#22C55E"}}>
+                {isExpired?"⚠️ Trial Expired":isUrgent?"⏰ Trial Ending Soon":"✅ Free Trial Active"}
+              </div>
+              <div style={{fontSize:11,color:"#888",marginTop:2,lineHeight:1.4}}>
+                {isExpired
+                  ?"Your 7-day trial has ended. Upgrade to keep access."
+                  :daysLeft===1?"Last day of your free trial — upgrade today."
+                  :daysLeft+" days remaining in your free trial."}
+              </div>
+            </div>
+            <button onClick={function(){alert("Stripe billing integration coming soon. Contact support@turnready.app to upgrade.");}}
+              style={{background:isExpired?"#EF4444":isUrgent?"#F59E0B":"#CC0000",border:"none",borderRadius:7,
+                padding:"7px 12px",color:isUrgent?"#000":"#FFF",fontSize:11,fontWeight:900,
+                fontFamily:"Arial Black,sans-serif",cursor:"pointer",flexShrink:0,letterSpacing:.3}}>
+              UPGRADE
+            </button>
+          </div>
+        );
+      })()}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:14}}>
         <div onClick={()=>setView("Properties")} style={{background:C.card,border:"1px solid "+(C.border),borderRadius:10,padding:"10px 6px",cursor:"pointer",textAlign:"center",overflow:"hidden"}}>
           <div style={{fontSize:8,color:C.muted,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>PROPERTIES</div>
@@ -3491,27 +3590,33 @@ function Cleaners({cleaners,setCleaners,jobs,pendingCleaners,setPendingCleaners,
       </div>
       {showInvite&&<div className="card" style={{marginBottom:16,border:"1px solid rgba(204,0,0,.3)"}}>
         <div style={{fontFamily:"Arial Black,sans-serif",fontSize:14,fontWeight:900,letterSpacing:.5,color:"#CC0000",marginBottom:4}}>INVITE A CLEANER</div>
-        <div style={{fontSize:12,color:"#888",marginBottom:14,lineHeight:1.6}}>Share the invite code with your cleaner. With the code they sign in instantly.</div>
-        <div style={{background:"#0D0D0D",border:"1px solid #CC0000",borderRadius:10,padding:14,marginBottom:12,textAlign:"center"}}>
-          <div style={{fontSize:10,color:"#888",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Your Invite Code</div>
-          <div style={{fontFamily:"Arial Black,sans-serif",fontSize:26,fontWeight:900,letterSpacing:4,color:"#FFF",marginBottom:10}}>HARVEY2024</div>
-          <button onClick={function(){if(navigator.clipboard)navigator.clipboard.writeText("HARVEY2024");setInviteCopied(true);setTimeout(function(){setInviteCopied(false);},2000);}}
-            style={{background:"#CC0000",border:"none",borderRadius:6,padding:"7px 18px",color:"#FFF",fontSize:11,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer"}}>
-            {inviteCopied?"COPIED!":"COPY CODE"}
-          </button>
-        </div>
-        <div style={{background:"rgba(34,197,94,.06)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,padding:"10px 12px",marginBottom:12,fontSize:11,color:"#888",lineHeight:1.6}}>
-          Tell your cleaner: Open TurnReady, tap New Cleaner, fill in their info, enter the code <strong style={{color:"#FFF"}}>HARVEY2024</strong> and they will be signed in instantly with full access.
-        </div>
+        <div style={{fontSize:12,color:"#888",marginBottom:14,lineHeight:1.6}}>Share your invite code with your cleaner. With the code they sign in instantly.</div>
+        {(function(){
+          var code=(user&&(user.invite_code||user.inviteCode))||"HARVEY2024";
+          return(
+            <div>
+              <div style={{background:"#0D0D0D",border:"1px solid #CC0000",borderRadius:10,padding:14,marginBottom:12,textAlign:"center"}}>
+                <div style={{fontSize:10,color:"#888",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Your Invite Code</div>
+                <div style={{fontFamily:"Arial Black,sans-serif",fontSize:26,fontWeight:900,letterSpacing:4,color:"#FFF",marginBottom:10}}>{code}</div>
+                <button onClick={function(){if(navigator.clipboard)navigator.clipboard.writeText(code);setInviteCopied(true);setTimeout(function(){setInviteCopied(false);},2000);}}
+                  style={{background:"#CC0000",border:"none",borderRadius:6,padding:"7px 18px",color:"#FFF",fontSize:11,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer"}}>
+                  {inviteCopied?"COPIED!":"COPY CODE"}
+                </button>
+              </div>
+              <div style={{background:"rgba(34,197,94,.06)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,padding:"10px 12px",marginBottom:12,fontSize:11,color:"#888",lineHeight:1.6}}>
+                Tell your cleaner: Open TurnReady, tap New Cleaner, fill in their info, enter the code <strong style={{color:"#FFF"}}>{code}</strong> and they will be signed in instantly with full access.
+              </div>
+            </div>
+          );
+        })()}
         <div style={{background:"#0D0D0D",border:"1px solid #2A2A2A",borderRadius:8,padding:"12px 14px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
           <div style={{fontSize:11,color:"#AAA",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>app.turnready.app</div>
           <button onClick={()=>{if(navigator.clipboard)navigator.clipboard.writeText("app.turnready.app");setInviteCopied(true);setTimeout(()=>setInviteCopied(false),2000);}} style={{background:"#CC0000",border:"none",borderRadius:6,padding:"6px 12px",color:"#FFF",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>{inviteCopied?"✓ Copied!":"Copy Link"}</button>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <button className="btn" style={{flex:1}} onClick={()=>{var shareMsg="Hi! Join my cleaning team on TurnReady: app.turnready.app";if(navigator.share)navigator.share({title:"Join my TurnReady team",text:shareMsg});else if(navigator.clipboard){navigator.clipboard.writeText(shareMsg);setInviteCopied(true);setTimeout(()=>setInviteCopied(false),2000);}}}>📱 Share via Phone</button>
+          <button className="btn" style={{flex:1}} onClick={()=>{var code2=(user&&(user.invite_code||user.inviteCode))||"HARVEY2024";var shareMsg="Hi! Join my cleaning team on TurnReady. Download the app at app.turnready.app and use invite code "+code2+" to sign up instantly.";if(navigator.share)navigator.share({title:"Join my TurnReady team",text:shareMsg});else if(navigator.clipboard){navigator.clipboard.writeText(shareMsg);setInviteCopied(true);setTimeout(()=>setInviteCopied(false),2000);}}}>📱 Share via Phone</button>
           <button className="btn ghost sm" onClick={()=>setShowInvite(false)}>Close</button>
         </div>
-        <div style={{fontSize:10,color:"#555",marginTop:10,textAlign:"center"}}>Invite links are fully active after deployment.</div>
       </div>}
       {teamView!=="availability"&&(
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
@@ -9982,7 +10087,7 @@ export default function App() {
     if(!user)return null;
     if(user.role==="manager"){
         switch(view){
-          case "Dashboard": return <Dashboard props={props} cleaners={cleaners} jobs={jobs} setView={setView} notifications={notifications} onSelectCleaner={(c)=>{setSelectedCleaner(c);setView("Team");}}/>;
+          case "Dashboard": return <Dashboard props={props} cleaners={cleaners} jobs={jobs} setView={setView} notifications={notifications} user={user} onSelectCleaner={(c)=>{setSelectedCleaner(c);setView("Team");}}/>;
           case "Properties": return <Properties props={props} setProps={setProps} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){
               setNotifications(function(prev){return prev.concat([n]);});
               if(user&&user.id&&user.id.includes("-")){
