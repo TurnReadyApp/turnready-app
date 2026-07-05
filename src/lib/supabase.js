@@ -13,7 +13,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 
-export async function signUp({ email, password, name, role, inviteCode, phone }) {
+export async function signUp({ email, password, name, role, inviteCode, phone, plan }) {
   // 1. Create auth user
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: email.trim().toLowerCase(),
@@ -24,23 +24,37 @@ export async function signUp({ email, password, name, role, inviteCode, phone })
 
   const userId = authData.user.id
   const avatarInitials = name.trim().split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase()
+  const now = new Date().toISOString()
 
   // 2. Insert profile into users table
-  const { error: profileError } = await supabase.from('users').insert({
+  const profileData = {
     id: userId,
     email: email.trim().toLowerCase(),
     name: name.trim(),
     role,
     avatar: avatarInitials,
     phone: phone || null,
-    invite_code: inviteCode || null,
-    plan: role === 'manager' ? 'pro' : null,
     rating: 5.0,
     jobs_completed: 0,
     total_earned: 0,
     stripe_status: 'pending',
-    joined_at: new Date().toISOString()
-  })
+    joined_at: now
+  }
+
+  if (role === 'manager') {
+    // Managers get their OWN invite code (generated in app and passed here)
+    // and a trial start date
+    profileData.invite_code = inviteCode || null
+    profileData.plan = plan || 'pro'
+    profileData.trial_start = now
+  } else if (role === 'cleaner') {
+    // Cleaners store the manager's invite code they used to sign up
+    // manager_id gets set separately after looking up who owns the code
+    profileData.invite_code = inviteCode || null
+    profileData.plan = null
+  }
+
+  const { error: profileError } = await supabase.from('users').insert(profileData)
   if (profileError) throw profileError
 
   return { userId, email, name, role }
@@ -120,14 +134,37 @@ export async function getCleanersByInviteCode(inviteCode) {
 }
 
 export async function getTeamCleaners(managerId) {
-  // Get cleaners linked to this manager via property_cleaners
-  const { data, error } = await supabase
+  // Get cleaners linked to this manager via manager_id column
+  // Falls back to invite_code match for legacy cleaners who signed up before manager_id was set
+  const { data: byManagerId, error: e1 } = await supabase
     .from('users')
     .select('*')
     .eq('role', 'cleaner')
+    .eq('manager_id', managerId)
     .order('name')
-  if (error) throw error
-  return data || []
+
+  if (!e1 && byManagerId && byManagerId.length > 0) {
+    return byManagerId
+  }
+
+  // Legacy fallback: get manager's invite code, then find cleaners who used it
+  const { data: mgr } = await supabase
+    .from('users')
+    .select('invite_code')
+    .eq('id', managerId)
+    .single()
+
+  if (mgr && mgr.invite_code) {
+    const { data: byCode, error: e2 } = await supabase
+      .from('users')
+      .select('*')
+      .eq('role', 'cleaner')
+      .eq('invite_code', mgr.invite_code)
+      .order('name')
+    if (!e2) return byCode || []
+  }
+
+  return []
 }
 
 // ── PROPERTIES ────────────────────────────────────────────────────────────────
