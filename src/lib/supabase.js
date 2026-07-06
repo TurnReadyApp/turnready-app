@@ -597,3 +597,49 @@ export async function uploadImageToStorage(bucket, path, base64DataUrl) {
 export function isStorageUrl(str) {
   return str && (str.startsWith('http://') || str.startsWith('https://'))
 }
+// ── STRIPE CONNECT ────────────────────────────────────────────────────────────
+
+export async function createStripeConnectAccount({ userId, userType, email, name, businessName }) {
+  const response = await fetch('/api/create-connect-account', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, userType, email, name, businessName }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Failed to create Stripe account');
+  return data;
+}
+
+export async function payCleanerStripe({ cleanerStripeAccountId, amountCents, jobId, propertyName, managerId }) {
+  const response = await fetch('/api/pay-cleaner', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cleanerStripeAccountId, amountCents, jobId, propertyName, managerId }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Payment failed');
+  return data;
+}
+
+export async function createStripeCheckoutSession({ managerId, managerEmail, managerName, businessName, plan, stripeCustomerId }) {
+  const response = await fetch('/api/create-checkout-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ managerId, managerEmail, managerName, businessName, plan, stripeCustomerId }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Failed to create checkout session');
+  return data;
+}
+
+export async function getCleanersByInviteCode(inviteCode) {
+  if (!inviteCode) return null;
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, name, email, business_name, invite_code')
+    .eq('role', 'manager')
+    .eq('invite_code', inviteCode.trim().toUpperCase())
+    .single();
+  if (error) return null;
+  return data;
+}
