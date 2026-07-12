@@ -6979,16 +6979,57 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
         );
       })()}
 
-      {jobsTab==="active"&&myProps.length===0&&(
-        <div className="card" style={{textAlign:"center",padding:36}}>
-          <div style={{fontSize:44,marginBottom:12}}>🧹</div>
-          <div style={{fontFamily:"Arial Black,sans-serif",fontSize:15,fontWeight:900,letterSpacing:.5,marginBottom:8}}>NO JOBS ASSIGNED YET</div>
-          <div style={{fontSize:12,color:C.muted,lineHeight:1.7,marginBottom:16}}>Your manager hasn't assigned any cleaning jobs to you yet. Check back soon or reach out to them directly.</div>
-          <div style={{background:"rgba(204,0,0,.06)",border:"1px solid rgba(204,0,0,.2)",borderRadius:10,padding:14,fontSize:12,color:"#888",lineHeight:1.6,textAlign:"left"}}>
-            💡 Once assigned you'll see the property here with your full checklist, staging guides, inventory, and everything you need to complete the job and get paid.
+      {jobsTab==="active"&&myProps.length===0&&(function(){
+        // Check if there are pending jobs in the jobs array even if props aren't loaded
+        var pendingJobs=(jobs||[]).filter(function(j){return j.cleanerId===user.id&&(j.status==="pending_acceptance"||j.status==="accepted"||j.status==="in_progress");});
+        if(pendingJobs.length===0) return(
+          <div className="card" style={{textAlign:"center",padding:36}}>
+            <div style={{fontSize:44,marginBottom:12}}>🧹</div>
+            <div style={{fontFamily:"Arial Black,sans-serif",fontSize:15,fontWeight:900,letterSpacing:.5,marginBottom:8}}>NO JOBS ASSIGNED YET</div>
+            <div style={{fontSize:12,color:C.muted,lineHeight:1.7,marginBottom:16}}>Your manager hasn't assigned any cleaning jobs to you yet. Check back soon or reach out to them directly.</div>
           </div>
-        </div>
-      )}
+        );
+        // Show jobs directly from jobs array
+        return(
+          <div>
+            {pendingJobs.map(function(job){
+              var isPending=job.status==="pending_acceptance";
+              return(
+                <div key={job.id} style={{background:C.card,borderRadius:12,marginBottom:14,overflow:"hidden",border:"1px solid "+(isPending?"rgba(245,158,11,.4)":C.border)}}>
+                  <div style={{padding:"14px 16px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <div style={{fontWeight:700,fontSize:15}}>{job.propertyName||"Property"}</div>
+                      <span style={{background:"rgba(34,197,94,.15)",color:"#22C55E",fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10}}>{fmt(job.pay||0)}</span>
+                    </div>
+                    {job.scheduledDate&&<div style={{fontSize:12,color:"#888",marginBottom:6}}>📅 {job.scheduledDate}{job.scheduledTime?" at "+job.scheduledTime:""}</div>}
+                    {isPending&&(
+                      <div style={{background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.3)",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+                        <div style={{fontSize:12,color:"#F59E0B",fontWeight:700,marginBottom:6}}>⏳ Awaiting your response — 8 hour window</div>
+                        <div style={{display:"flex",gap:8}}>
+                          <button onClick={function(){
+                            setJobs(function(js){return js.map(function(j){return j.id!==job.id?j:Object.assign({},j,{status:"accepted"});});});
+                            if(job.id&&job.id.includes("-")){updateJob(job.id,{status:"accepted"}).catch(function(){});}
+                            addNotification&&addNotification({type:"accepted",icon:"✅",title:"Job Accepted!",body:"You accepted the job at "+job.propertyName+".",forRole:"cleaner",navTo:"My Jobs",time:new Date().toISOString(),read:false});
+                          }} style={{flex:1,background:"#22C55E",border:"none",borderRadius:6,padding:"9px",color:"#FFF",fontSize:12,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",touchAction:"manipulation"}}>✓ ACCEPT</button>
+                          <button onClick={function(){
+                            setJobs(function(js){return js.map(function(j){return j.id!==job.id?j:Object.assign({},j,{status:"declined"});});});
+                            if(job.id&&job.id.includes("-")){updateJob(job.id,{status:"declined"}).catch(function(){});}
+                          }} style={{flex:1,background:"transparent",border:"1px solid #EF4444",borderRadius:6,padding:"9px",color:"#EF4444",fontSize:12,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",touchAction:"manipulation"}}>✗ DECLINE</button>
+                        </div>
+                      </div>
+                    )}
+                    {!isPending&&(
+                      <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#22C55E",fontWeight:700}}>
+                        ✅ Accepted — your manager will share property details
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
       {jobsTab==="active"&&myProps.map(function(prop){
         var tasks=prop.tasks||[];
         var done=tasks.filter(function(t){return t.done;}).length;
