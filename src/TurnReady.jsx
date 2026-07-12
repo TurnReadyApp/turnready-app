@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { supabase, signIn, signUp, signOut, getCurrentUser, updateUserProfile, getTeamCleaners, getProperties, getPropertyFull, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications, uploadVideoToStorage, uploadImageToStorage, isStorageUrl } from "./lib/supabase.js";
+import { supabase, signIn, signUp, signOut, getCurrentUser, updateUserProfile, getTeamCleaners, getProperties, getPropertyFull, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications, uploadVideoToStorage, uploadImageToStorage, isStorageUrl, createStripeConnectAccount, payCleanerStripe, createStripeCheckoutSession, getCleanersByInviteCode } from "./lib/supabase.js";
 
 
 
@@ -1487,7 +1487,25 @@ function Dashboard({props,cleaners,jobs,setView,notifications,user,onSelectClean
                   :daysLeft+" days remaining in your free trial."}
               </div>
             </div>
-            <button onClick={function(){alert("Stripe billing integration coming soon. Contact support@turnready.app to upgrade.");}}
+            <button onClick={async function(){
+              if(!user||!user.id)return;
+              var btn=document.activeElement;
+              if(btn){btn.disabled=true;btn.textContent="⏳ LOADING...";}
+              try{
+                var result=await createStripeCheckoutSession({
+                  managerId:user.id,
+                  managerEmail:user.email,
+                  managerName:user.name,
+                  businessName:user.businessName||user.business_name,
+                  plan:user.plan&&user.plan!=="trial"?user.plan:"pro",
+                  stripeCustomerId:user.stripe_customer_id||null,
+                });
+                window.location.href=result.checkoutUrl;
+              }catch(e){
+                if(btn){btn.disabled=false;btn.textContent="UPGRADE";}
+                alert("Billing error: "+e.message+"\n\nContact support@turnready.app for help.");
+              }
+            }}
               style={{background:isExpired?"#EF4444":isUrgent?"#F59E0B":"#CC0000",border:"none",borderRadius:7,
                 padding:"7px 12px",color:isUrgent?"#000":"#FFF",fontSize:11,fontWeight:900,
                 fontFamily:"Arial Black,sans-serif",cursor:"pointer",flexShrink:0,letterSpacing:.3}}>
@@ -4383,26 +4401,27 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
       return;
     }
     var cleaner=cleaners.find(function(c){return c.id===job.cleanerId;})||{};
-    var payoutStatus=cleaner.stripeStatus==="connected"?"paid":"pending_stripe";
-    setJobs(function(js){return js.map(function(j){return j.id===jobId?Object.assign({},j,{status:"approved",paidAt:new Date().toISOString(),payoutStatus:payoutStatus,stripeAccount:cleaner.stripeAccount||null}):j;});});
-    // Reset property tasks, inventory, room videos for next clean
+    var cleaner1Pay=job.pay1||job.pay;
+    var cleaner2Pay=job.pay2||0;
+    var realJobId=job.dbId||job.id;
+    var propName=(props.find(function(p){return p.id===job.propertyId;})||{}).name||job.propertyName||"";
+    var isRealJob=realJobId&&realJobId.includes("-");
+    var isRealCleaner=cleaner.stripeAccount&&cleaner.stripeAccount.startsWith("acct_")&&cleaner.stripeStatus==="connected";
+
+    // Update local state immediately (optimistic)
+    setJobs(function(js){return js.map(function(j){
+      return j.id!==jobId?j:Object.assign({},j,{status:"approved",paidAt:new Date().toISOString(),
+        payoutStatus:isRealCleaner?"processing":"pending_stripe",stripeAccount:cleaner.stripeAccount||null});
+    });});
     setProps(function(ps){return ps.map(function(pp){
       if(pp.id!==job.propertyId&&pp.name!==job.propertyName)return pp;
       return Object.assign({},pp,{
-        // Reset tasks to unchecked
         tasks:(pp.tasks||[]).map(function(t){return Object.assign({},t,{done:false});}),
-        // Clear cleaner inventory statuses
         inventory:(pp.inventory||[]).map(function(i){return Object.assign({},i,{cleanerStatus:null});}),
-        // Clear room videos and pre-clean videos (keep ref photos/ref videos)
         rooms:(pp.rooms||[]).map(function(r){return Object.assign({},r,{video:null,preVideo:null});}),
-        // Clear cleaner notes
-        cleanerNotes:"",
-        cleanerPhotos:[],
+        cleanerNotes:"",cleanerPhotos:[],
       });
     });});
-    // Pay primary cleaner their amount (full pay if solo, split if duo)
-    var cleaner1Pay=job.pay1||job.pay;
-    var cleaner2Pay=job.pay2||0;
     setCleaners(function(cs){return cs.map(function(c){
       if(c.id===job.cleanerId)return Object.assign({},c,{totalEarned:c.totalEarned+cleaner1Pay,jobsCompleted:c.jobsCompleted+1});
       if(job.cleanerId2&&c.id===job.cleanerId2)return Object.assign({},c,{totalEarned:c.totalEarned+cleaner2Pay,jobsCompleted:c.jobsCompleted+1});
@@ -4412,15 +4431,70 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
     setRatingJob(job);
     setManagerRating(0);
     setManagerComment("");
-    // Persist to Supabase if real job
-    if(job.dbId||(job.id&&job.id.includes("-"))){
-      var realJobId=job.dbId||job.id;
+
+    // Save approval to Supabase
+    if(isRealJob){
       updateJob(realJobId,{status:"approved",paid_at:new Date().toISOString()}).catch(function(e){console.error("Approve save failed:",e.message);});
     }
-    // Also update cleaner stats in Supabase
-    if(job.cleanerId&&job.cleanerId.length>20){
+    // Update cleaner earnings in Supabase
+    if(job.cleanerId&&job.cleanerId.includes("-")){
       var cl=cleaners.find(function(c){return c.id===job.cleanerId;})||{};
       updateUserProfile(job.cleanerId,{total_earned:(cl.totalEarned||0)+cleaner1Pay,jobs_completed:(cl.jobsCompleted||0)+1}).catch(function(e){console.error("Cleaner stats save:",e.message);});
+    }
+
+    // ── REAL STRIPE PAYOUT ──────────────────────────────────────────────────
+    // Only attempt real transfer if:
+    //   1. The cleaner has a real connected Stripe account (starts with acct_, status=connected)
+    //   2. The manager's Stripe account is connected (not just pending_verification)
+    //   3. This is a real Supabase job (UUID, not a demo job)
+    if(isRealJob&&isRealCleaner&&user.stripeBusinessStatus==="connected"){
+      var amountCents=Math.round(cleaner1Pay*100);
+      payCleanerStripe({
+        cleanerStripeAccountId:cleaner.stripeAccount,
+        amountCents:amountCents,
+        jobId:realJobId,
+        propertyName:propName,
+        managerId:user.id,
+      }).then(function(result){
+        console.log("[TurnReady] Stripe transfer created:",result.transferId,"Amount: $"+(result.amount/100));
+        // Update job with transfer ID
+        setJobs(function(js){return js.map(function(j){
+          return j.id!==jobId?j:Object.assign({},j,{payoutStatus:"paid",stripeTransferId:result.transferId});
+        });});
+        if(isRealJob){
+          updateJob(realJobId,{stripe_transfer_id:result.transferId,paid_at:new Date().toISOString(),status:"paid"}).catch(function(e){console.error("Transfer ID save:",e.message);});
+        }
+        // Also pay second cleaner if duo job
+        if(job.cleanerId2&&cleaner2Pay>0){
+          var cleaner2=cleaners.find(function(c){return c.id===job.cleanerId2;})||{};
+          if(cleaner2.stripeAccount&&cleaner2.stripeAccount.startsWith("acct_")&&cleaner2.stripeStatus==="connected"){
+            payCleanerStripe({
+              cleanerStripeAccountId:cleaner2.stripeAccount,
+              amountCents:Math.round(cleaner2Pay*100),
+              jobId:realJobId+"_c2",
+              propertyName:propName,
+              managerId:user.id,
+            }).then(function(r2){
+              console.log("[TurnReady] Second cleaner transfer:",r2.transferId);
+            }).catch(function(e2){console.error("Second cleaner payout failed:",e2.message);});
+          }
+        }
+      }).catch(function(e){
+        console.error("[TurnReady] Stripe transfer failed:",e.message);
+        // Mark job as payout_failed so manager can retry
+        setJobs(function(js){return js.map(function(j){
+          return j.id!==jobId?j:Object.assign({},j,{payoutStatus:"payout_failed",payoutError:e.message});
+        });});
+        if(isRealJob){
+          updateJob(realJobId,{payout_status:"payout_failed"}).catch(function(){}); 
+        }
+      });
+    } else if(isRealCleaner&&user.stripeBusinessStatus!=="connected"){
+      // Manager's Stripe not fully verified yet
+      console.log("[TurnReady] Payout queued — manager Stripe account pending verification");
+    } else if(!isRealCleaner){
+      // Cleaner hasn't connected Stripe
+      console.log("[TurnReady] Payout pending — cleaner has not connected Stripe account");
     }
   }
 
@@ -9315,7 +9389,43 @@ export default function App() {
         }
       });
     }catch(e){}
-    // Real users: wipe ALL prop caches on startup — Supabase is the only source of truth.
+    // ── STRIPE RETURN URL HANDLER ─────────────────────────────────────────────
+    // When Stripe redirects back to the app after Connect onboarding or Checkout,
+    // it adds ?stripe=success (or subscribed, refresh, cancelled) to the URL.
+    // Detect this and update the user's Stripe status accordingly.
+    try{
+      var urlParams=new URLSearchParams(window.location.search);
+      var stripeParam=urlParams.get("stripe");
+      var stripeAccount=urlParams.get("account");
+      var stripeUserId=urlParams.get("user");
+      var stripePlan=urlParams.get("plan");
+      var stripeCustomer=urlParams.get("customer");
+      if(stripeParam){
+        // Clean the URL so the params don't persist on refresh
+        window.history.replaceState({},"",window.location.pathname);
+        if(stripeParam==="success"&&stripeAccount){
+          // Stripe Connect onboarding complete — update user profile
+          // The webhook will also fire and update Supabase, but update local state immediately
+          console.log("[TurnReady] Stripe Connect onboarding complete, account:",stripeAccount);
+          // Will be applied after getCurrentUser() runs below and sets the user
+          try{localStorage.setItem("turnready_stripe_return","connect_success");}catch(e){}
+        } else if(stripeParam==="subscribed"&&stripePlan){
+          // Stripe Checkout complete — subscription activated
+          console.log("[TurnReady] Stripe subscription activated, plan:",stripePlan);
+          try{localStorage.setItem("turnready_stripe_return","subscribed_"+stripePlan);}catch(e){}
+          if(stripeCustomer&&stripeUserId){
+            // Save the customer ID to Supabase (webhook will activate the plan)
+            updateUserProfile(stripeUserId,{stripe_customer_id:stripeCustomer,plan:stripePlan}).catch(function(e){console.error("Post-checkout profile update:",e.message);});
+          }
+        } else if(stripeParam==="refresh"&&stripeAccount){
+          // Stripe link expired — we'd need to generate a new one
+          console.log("[TurnReady] Stripe Connect link expired, need to regenerate");
+          try{localStorage.setItem("turnready_stripe_return","connect_refresh");}catch(e){}
+        } else if(stripeParam==="cancelled"){
+          console.log("[TurnReady] Stripe Checkout cancelled by user");
+        }
+      }
+    }catch(e){}
     try{
       var _isR=localStorage.getItem("turnready_is_real_user");
       if(_isR==="true"){
@@ -9329,6 +9439,33 @@ export default function App() {
       if(profile){
         // Mark as real user so demo data doesn't load
         try{localStorage.setItem("turnready_is_real_user","true");}catch(e){}
+        // Check if returning from Stripe
+        try{
+          var stripeReturn=localStorage.getItem("turnready_stripe_return");
+          if(stripeReturn){
+            localStorage.removeItem("turnready_stripe_return");
+            if(stripeReturn==="connect_success"){
+              // Stripe Connect onboarding just completed
+              setTimeout(function(){
+                setNotifications(function(prev){
+                  return [{id:"notif"+Date.now(),type:"stripe",icon:"✅",title:"Stripe Connected!",
+                    body:"Your Stripe account is now connected. You can send and receive payouts.",
+                    time:new Date().toISOString(),read:false}].concat(prev);
+                });
+              },1000);
+            } else if(stripeReturn.startsWith("subscribed_")){
+              var activatedPlan=stripeReturn.replace("subscribed_","");
+              setTimeout(function(){
+                setNotifications(function(prev){
+                  return [{id:"notif"+Date.now(),type:"subscription",icon:"🎉",
+                    title:"Subscription Activated!",
+                    body:"Your "+activatedPlan.charAt(0).toUpperCase()+activatedPlan.slice(1)+" plan is now active. Thank you!",
+                    time:new Date().toISOString(),read:false}].concat(prev);
+                });
+              },1000);
+            }
+          }
+        }catch(e){}
         // Load notifications from Supabase
         if(profile.id&&profile.id.length>10){
           getNotifications(profile.id).then(function(dbNotifs){
@@ -9882,11 +10019,11 @@ export default function App() {
       <div style={{padding:"16px 24px 32px"}}>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           <button onClick={function(){setOnboardingStep("stripe");}}
-            style={{width:"100%",background:"#CC0000",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer"}}>
+            style={{width:"100%",background:"#CC0000",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer",WebkitAppearance:"none",touchAction:"manipulation"}}>
             NEXT: SET UP PAYMENTS →
           </button>
           <button onClick={function(){setShowOnboarding(false);setOnboardingStep("welcome");setView("Home");}}
-            style={{width:"100%",background:"transparent",border:"1px solid #333",borderRadius:10,padding:"12px",color:"#666",fontSize:12,cursor:"pointer"}}>
+            style={{width:"100%",background:"transparent",border:"1px solid #333",borderRadius:10,padding:"12px",color:"#666",fontSize:12,cursor:"pointer",WebkitAppearance:"none",touchAction:"manipulation"}}>
             Skip — Go to the App
           </button>
         </div>
@@ -9940,37 +10077,43 @@ export default function App() {
           );})}
         </div>
 
-        {/* Demo note */}
-        <div style={{background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.25)",borderRadius:10,padding:12,marginBottom:20,fontSize:11,color:"#888",lineHeight:1.6}}>
-          <span style={{color:"#F59E0B",fontWeight:700}}>📋 Demo Mode: </span>
-          In production this button opens Stripe's secure onboarding flow. For now tap to simulate connection.
+        {/* Secure note */}
+        <div style={{background:"rgba(99,91,255,.08)",border:"1px solid rgba(99,91,255,.25)",borderRadius:10,padding:12,marginBottom:20,fontSize:11,color:"#888",lineHeight:1.6}}>
+          <span style={{color:"#635BFF",fontWeight:700}}>🔒 Secure: </span>
+          Clicking below opens Stripe's onboarding. TurnReady never sees your banking details — everything is handled by Stripe.
         </div>
       </div>
 
       {/* Bottom buttons */}
       <div style={{padding:"16px 24px 32px",borderTop:"1px solid #2A2A2A"}}>
-        {/* Connect Stripe button */}
-        <button onClick={function(){
-          var acct="acct_"+Date.now();
-          var updatedUser=Object.assign({},user,{stripeStatus:"connected",stripeAccount:acct,stripe_status:"connected",stripe_account_id:acct});
-          setCleaners(function(cs){return cs.map(function(c){
-            return c.id!==user.id?c:Object.assign({},c,{stripeStatus:"connected",stripeAccount:acct});
-          });});
-          setUser(updatedUser);
+        {/* Connect Stripe button — REAL Stripe Connect */}
+        <button onClick={async function(){
+          if(!user||!user.id)return;
+          var btn=document.activeElement;
+          if(btn){btn.disabled=true;btn.textContent="⏳ OPENING STRIPE...";}
           try{
-            var stored=localStorage.getItem("turnready_cleaners");
-            var existing=stored?JSON.parse(stored):[];
-            var fi=existing.findIndex(function(c){return c.id===user.id;});
-            if(fi>=0)existing[fi]=Object.assign({},existing[fi],{stripeStatus:"connected",stripeAccount:acct});
-            else existing.push(updatedUser);
-            localStorage.setItem("turnready_cleaners",JSON.stringify(existing));
-          }catch(e){}
-          // Save to Supabase
-          if(user&&user.id){
-            updateUserProfile(user.id,{stripe_status:"connected",stripe_account_id:acct}).catch(function(e){console.error("Cleaner Stripe save:",e.message);});
+            var result=await createStripeConnectAccount({
+              userId:user.id,
+              userType:"cleaner",
+              email:user.email,
+              name:user.name,
+            });
+            // Save the Stripe account ID before onboarding completes
+            var updatedUser=Object.assign({},user,{stripeAccount:result.accountId,stripe_account_id:result.accountId,stripeStatus:"pending_verification"});
+            setUser(updatedUser);
+            setCleaners(function(cs){return cs.map(function(c){
+              return c.id!==user.id?c:Object.assign({},c,{stripeAccount:result.accountId,stripeStatus:"pending_verification"});
+            });});
+            if(user.id.includes("-")){
+              updateUserProfile(user.id,{stripe_account_id:result.accountId,stripe_status:"pending_verification"}).catch(function(e){console.error("Cleaner Stripe save:",e.message);});
+            }
+            // Open Stripe's hosted onboarding page
+            window.location.href=result.onboardingUrl;
+          }catch(e){
+            console.error("Cleaner Stripe Connect error:",e.message);
+            if(btn){btn.disabled=false;btn.textContent="💳 CONNECT STRIPE & GET PAID";}
+            alert("Stripe setup error: "+e.message+"\n\nPlease try again or contact support@turnready.app");
           }
-          setShowOnboarding(false);
-          setOnboardingStep("welcome");
         }} style={{width:"100%",background:"#635BFF",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer",marginBottom:10}}>
           💳 CONNECT STRIPE & GET PAID
         </button>
@@ -10050,25 +10193,37 @@ export default function App() {
           </div>
         </div>
 
-        <div style={{background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.25)",borderRadius:10,padding:12,marginBottom:8,fontSize:11,color:"#888",lineHeight:1.6}}>
-          <span style={{color:"#F59E0B",fontWeight:700}}>📋 Demo Mode: </span>
-          In production this opens Stripe's secure business onboarding. Tap below to simulate.
+        <div style={{background:"rgba(99,91,255,.08)",border:"1px solid rgba(99,91,255,.25)",borderRadius:10,padding:12,marginBottom:8,fontSize:11,color:"#888",lineHeight:1.6}}>
+          <span style={{color:"#635BFF",fontWeight:700}}>🔒 Secure: </span>
+          Clicking below opens Stripe's secure onboarding. TurnReady never sees your banking details.
         </div>
       </div>
 
       <div style={{padding:"16px 24px 32px",borderTop:"1px solid #2A2A2A"}}>
         <button onClick={async function(){
-          var acct="acct_mgr_"+Date.now();
-          var updated=Object.assign({},user,{stripeBusinessStatus:"connected",stripeBusinessAccount:acct,stripe_business_status:"connected",stripe_business_account:acct});
-          setUser(updated);
-          setShowMgrStripe(false);
-          setView("Dashboard");
-          // Save to Supabase
-          if(user&&user.id&&user.id.includes("-")){
-            try{
-              var {updateUserProfile}=await import("./lib/supabase.js");
-              await updateUserProfile(user.id,{stripe_business_status:"connected",stripe_business_account:acct});
-            }catch(e){console.error("Stripe save failed:",e.message);}
+          if(!user||!user.id)return;
+          var btn=document.activeElement;
+          if(btn){btn.disabled=true;btn.textContent="⏳ OPENING STRIPE...";}
+          try{
+            var result=await createStripeConnectAccount({
+              userId:user.id,
+              userType:"manager",
+              email:user.email,
+              name:user.name,
+              businessName:user.businessName||user.business_name,
+            });
+            // Save the Stripe account ID immediately (before onboarding completes)
+            var updated=Object.assign({},user,{stripeBusinessAccount:result.accountId,stripe_business_account:result.accountId,stripeBusinessStatus:"pending_verification"});
+            setUser(updated);
+            if(user.id.includes("-")){
+              updateUserProfile(user.id,{stripe_business_account:result.accountId,stripe_business_status:"pending_verification"}).catch(function(e){console.error("Stripe account ID save:",e.message);});
+            }
+            // Open Stripe's hosted onboarding page
+            window.location.href=result.onboardingUrl;
+          }catch(e){
+            console.error("Stripe Connect error:",e.message);
+            if(btn){btn.disabled=false;btn.textContent="💳 CONNECT STRIPE BUSINESS ACCOUNT";}
+            alert("Stripe setup error: "+e.message+"\n\nMake sure STRIPE_SECRET_KEY is set in your Netlify environment variables.");
           }
         }} style={{width:"100%",background:"#635BFF",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer",marginBottom:10}}>
           💳 CONNECT STRIPE BUSINESS ACCOUNT
