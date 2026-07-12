@@ -2933,7 +2933,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
 }
 
 // ─── PROPERTIES ───────────────────────────────────────────────────────────────
-function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,addNotification,user}){
+function Properties({props,setProps,jobs,setJobs,cleaners,initialSel,onClearSel,availability,addNotification,user}){
   const [sel,setSel]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
   const [showTemplates,setShowTemplates]=useState(false);
@@ -10557,7 +10557,7 @@ export default function App() {
     if(user.role==="manager"){
         switch(view){
           case "Dashboard": return <Dashboard props={props} cleaners={cleaners} jobs={jobs} setView={setView} notifications={notifications} user={user} onSelectCleaner={(c)=>{setSelectedCleaner(c);setView("Team");}}/>;
-          case "Properties": return <Properties props={props} setProps={setProps} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){
+          case "Properties": return <Properties props={props} setProps={setProps} jobs={jobs} setJobs={setJobs} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){
               setNotifications(function(prev){return prev.concat([n]);});
               if(user&&user.id&&user.id.includes("-")){
                 createNotification({
