@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { supabase, signIn, signUp, signOut, getCurrentUser, updateUserProfile, getTeamCleaners, getProperties, getPropertyFull, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications, uploadVideoToStorage, uploadImageToStorage, isStorageUrl, createStripeConnectAccount, payCleanerStripe, createStripeCheckoutSession, getCleanersByInviteCode } from "./lib/supabase.js";
+import { supabase, signIn, signUp, signOut, getCurrentUser, getUserProfile, updateUserProfile, getTeamCleaners, getProperties, getPropertyFull, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications, uploadVideoToStorage, uploadImageToStorage, isStorageUrl, createStripeConnectAccount, payCleanerStripe, createStripeCheckoutSession, getCleanersByInviteCode } from "./lib/supabase.js";
 
 
 
@@ -3179,7 +3179,56 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
         schedule:(pp.schedule||[]).concat([newSlot])
       });
     });});
-    // Notify cleaner(s) of assignment
+
+    // Save job to Supabase so cleaner sees it on their dashboard
+    if(cleanerId&&propId&&propId.includes("-")&&cleanerId.includes("-")){
+      var dbJob={
+        property_id:propId,
+        property_name:theProp.name,
+        cleaner_id:cleanerId,
+        cleaner_id2:twoCleanerData&&twoCleanerData.cid2?twoCleanerData.cid2:null,
+        status:"pending_acceptance",
+        scheduled_date:date,
+        scheduled_time:time||"11:00",
+        pay:theProp.pay||0,
+        pay1:twoCleanerData?twoCleanerData.pay1:null,
+        pay2:twoCleanerData?twoCleanerData.pay2:null,
+        two_cleaners:!!twoCleanerData&&!!twoCleanerData.cid2,
+        deep_clean:twoCleanerData?!!twoCleanerData.deepClean:false,
+        assigned_at:new Date().toISOString(),
+      };
+      createJob(dbJob).then(function(saved){
+        if(saved){
+          // Add job to local state with the real DB id
+          var localJob={
+            id:saved.id,dbId:saved.id,
+            propertyId:propId,propertyName:theProp.name,
+            cleanerId:cleanerId,
+            status:"pending_acceptance",
+            scheduledDate:date,scheduledTime:time,
+            pay:theProp.pay||0,
+            pay1:twoCleanerData?twoCleanerData.pay1:null,
+            pay2:twoCleanerData?twoCleanerData.pay2:null,
+            twoCleaners:!!twoCleanerData&&!!twoCleanerData.cid2,
+            assignedAt:new Date().toISOString(),
+          };
+          setJobs(function(js){return [localJob].concat(js);});
+          console.log("[TurnReady] Job saved to Supabase:",saved.id);
+        }
+      }).catch(function(e){console.error("[TurnReady] Job save failed:",e.message);});
+
+      // Save notification to Supabase for the cleaner
+      createNotification({
+        user_id:cleanerId,
+        type:"assigned",
+        icon:"📋",
+        title:"New Job Assigned!",
+        body:"You have been assigned to clean "+theProp.name+" on "+date+" at "+(time||"11:00")+". You have 8 hours to accept or decline.",
+        read:false,
+      }).catch(function(e){console.error("Notification save failed:",e.message);});
+    }
+
+    // Local notification for real-time display
     if(cleanerId&&addNotification){
       addNotification({type:"assigned",icon:"📋",title:"New Job Assigned!",body:"You have been assigned to clean "+theProp.name+" on "+date+" at "+(time||"11:00")+". You have 8 hours to accept or decline.",forRole:"cleaner",forCleaner:cleanerId,navTo:"My Jobs",time:new Date().toISOString(),read:false});
     }
@@ -7093,13 +7142,22 @@ function Messages({user,cleaners,addNotification}){
   var _rmgr=user&&user.id&&user.id.includes("-");
   var contactList=isManager
     ?(_rmgr?cleaners.filter(function(c){return c.id&&c.id.includes("-");}):cleaners)
-    :[{id:"mgr1",name:"Harvey Johnson",avatar:"HJ",role:"manager",email:"manager@turnready.app"}];
+    :[{
+        id:user.manager_id||"mgr1",
+        name:user.managerName||user.manager_name||"Your Manager",
+        avatar:(user.managerName||user.manager_name||"M").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
+        role:"manager",
+        email:user.managerEmail||user.manager_email||""
+      }];
 
   // Load messages from Supabase when contact is selected
   useEffect(function(){
     if(!selCleaner||!user||!user.id||!user.id.includes("-"))return;
-    if(msgsLoaded[selCleaner.id]||!selCleaner.id||!selCleaner.id.includes("-"))return;
-    getMessages(user.id,selCleaner.id).then(function(dbMsgs){
+    // For cleaner messaging manager: use manager_id as the other party's ID
+    var otherId=isManager?selCleaner.id:(user.manager_id||selCleaner.id);
+    if(!otherId||!otherId.includes("-"))return;
+    if(msgsLoaded[otherId])return;
+    getMessages(user.id,otherId).then(function(dbMsgs){
       if(dbMsgs&&dbMsgs.length>0){
         var mapped=dbMsgs.map(function(m){
           return {
@@ -7116,7 +7174,7 @@ function Messages({user,cleaners,addNotification}){
           updated[key]=mapped;
           return updated;
         });
-        setMsgsLoaded(function(prev){return Object.assign({},prev,{[selCleaner.id]:true});});
+        setMsgsLoaded(function(prev){return Object.assign({},prev,{[otherId]:true});});
       }
     }).catch(function(e){console.error("Messages load failed:",e.message);});
   },[selCleaner]);
@@ -7129,17 +7187,20 @@ function Messages({user,cleaners,addNotification}){
       media:mediaPreview?{url:mediaPreview.url,type:mediaPreview.type,name:mediaPreview.name}:null,
       time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})};
     setInput(""); setMediaPreview(null);
-    // Save to Supabase if real users
-    if(user&&user.id&&user.id.includes("-")&&selCleaner&&selCleaner.id&&selCleaner.id.includes("-")){
-      var toId=isManager?selCleaner.id:selCleaner.id; // manager sends to cleaner, cleaner sends to manager
-      sendMessage({
-        from_id:user.id,
-        to_id:toId,
-        text:newMsg.text||null,
-        media_url:newMsg.media?newMsg.media.url:null,
-        media_type:newMsg.media?newMsg.media.type:null,
-        media_name:newMsg.media?newMsg.media.name:null,
-      }).catch(function(e){console.error("Message save failed:",e.message);});
+    if(user&&user.id&&user.id.includes("-")&&selCleaner&&selCleaner.id){
+      // Manager sends to cleaner UUID; cleaner sends to their manager's UUID
+      var toId=isManager?selCleaner.id:(user.manager_id||selCleaner.id);
+      // Only save to Supabase if both IDs are real UUIDs
+      if(toId&&toId.includes("-")){
+        sendMessage({
+          from_id:user.id,
+          to_id:toId,
+          text:newMsg.text||null,
+          media_url:newMsg.media?newMsg.media.url:null,
+          media_type:newMsg.media?newMsg.media.type:null,
+          media_name:newMsg.media?newMsg.media.name:null,
+        }).catch(function(e){console.error("Message save failed:",e.message);});
+      }
     }
     setMsgs(function(prev){
       var updated=Object.assign({},prev);
@@ -9543,7 +9604,20 @@ export default function App() {
           invite_code:profile.invite_code||null,
           trial_start:profile.trial_start||null,
           plan:profile.plan||"trial",
+          manager_id:profile.manager_id||null,
         });
+        // For cleaners: load manager's name so contact list shows real name
+        if(profile.role==="cleaner"&&profile.manager_id){
+          getUserProfile(profile.manager_id).then(function(mgr){
+            if(mgr){
+              setUser(function(prev){return Object.assign({},prev,{
+                managerName:mgr.name,
+                managerEmail:mgr.email,
+                managerAvatar:(mgr.name||"M").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
+              });});
+            }
+          }).catch(function(){});
+        }
         // If this manager has no invite code yet, generate and save one now
         if(profile.role==="manager"&&!profile.invite_code){
           var biz=(profile.business_name||profile.name||"TURN").replace(/[^A-Za-z]/g,"").toUpperCase();
@@ -9553,7 +9627,28 @@ export default function App() {
         }
         setUser(mappedProfile);
         try{localStorage.setItem("turnready_session_user",JSON.stringify({id:profile.id,role:profile.role}));}catch(e){}
-        if(profile.role==="cleaner")setView("Home");
+        if(profile.role==="cleaner"){
+          setView("Home");
+          // Load cleaner's jobs from Supabase
+          getJobs({cleanerId:profile.id}).then(function(dbJobs){
+            if(dbJobs&&dbJobs.length>0){
+              var mappedJobs=dbJobs.map(function(j){
+                return Object.assign({},j,{
+                  dbId:j.id,id:j.id,
+                  propertyId:j.property_id,propertyName:j.property_name,
+                  cleanerId:j.cleaner_id,
+                  status:j.status||"pending_acceptance",
+                  scheduledDate:j.scheduled_date,scheduledTime:j.scheduled_time,
+                  completedAt:j.completed_at,paidAt:j.paid_at,startedAt:j.started_at,
+                  pay:j.pay||0,pay1:j.pay1,pay2:j.pay2,
+                  twoCleaners:j.two_cleaners||false,
+                  tasks:j.tasks||[],inventory:j.inventory||[],uploads:j.uploads||[],
+                });
+              });
+              setJobs(mappedJobs);
+            }
+          }).catch(function(e){console.error("Cleaner jobs load failed:",e.message);});
+        }
         if(profile.role==="manager"){
           setView("Dashboard");
           // Load jobs from Supabase on session restore
