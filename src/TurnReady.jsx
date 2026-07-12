@@ -3189,8 +3189,8 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
         cleaner_id:cleanerId,
         cleaner_id2:twoCleanerData&&twoCleanerData.cid2?twoCleanerData.cid2:null,
         status:"pending_acceptance",
-        scheduled_date:date,
-        scheduled_time:time||"11:00",
+        date:date,
+        time:time||"11:00",
         pay:theProp.pay||0,
         pay1:twoCleanerData?twoCleanerData.pay1:null,
         pay2:twoCleanerData?twoCleanerData.pay2:null,
@@ -9738,7 +9738,7 @@ export default function App() {
                     propertyId:j.property_id,propertyName:j.property_name,
                     cleanerId:j.cleaner_id,
                     status:j.status||"pending_acceptance",
-                    scheduledDate:j.scheduled_date,scheduledTime:j.scheduled_time,
+                    scheduledDate:j.scheduled_date||j.date,scheduledTime:j.scheduled_time||j.time,
                     completedAt:j.completed_at,paidAt:j.paid_at,startedAt:j.started_at,
                     pay:j.pay||0,pay1:j.pay1,pay2:j.pay2,
                     twoCleaners:j.two_cleaners||false,
@@ -9764,7 +9764,7 @@ export default function App() {
                 propertyId:j.property_id,propertyName:j.property_name,
                 cleanerId:j.cleaner_id,
                 status:j.status||"pending_acceptance",
-                scheduledDate:j.scheduled_date,scheduledTime:j.scheduled_time,
+                scheduledDate:j.scheduled_date||j.date,scheduledTime:j.scheduled_time||j.time,
                 pay:j.pay||0,pay1:j.pay1,pay2:j.pay2,
                 twoCleaners:j.two_cleaners||false,
                 tasks:[],inventory:[],uploads:[],
@@ -9779,7 +9779,7 @@ export default function App() {
                 return [{
                   id:"notif"+Date.now(),type:"assigned",icon:"📋",
                   title:"New Job Assigned!",
-                  body:"You have been assigned to clean "+(j.property_name||"a property")+(j.scheduled_date?" on "+j.scheduled_date:"")+". Tap to accept.",
+                  body:"You have been assigned to clean "+(j.property_name||"a property")+(j.scheduled_date||j.date?" on "+(j.scheduled_date||j.date):"")+". Tap to accept.",
                   forRole:"cleaner",navTo:"My Jobs",
                   time:new Date().toISOString(),read:false,
                 }].concat(prev).slice(0,50);
@@ -9794,7 +9794,7 @@ export default function App() {
                 return prev.map(function(job){
                   return job.id!==j.id?job:Object.assign({},job,{
                     status:j.status,
-                    scheduledDate:j.scheduled_date,
+                    scheduledDate:j.scheduled_date||j.date,
                     pay:j.pay||job.pay,
                   });
                 });
