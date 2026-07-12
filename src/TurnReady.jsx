@@ -3216,11 +3216,9 @@ function Properties({props,setProps,jobs,setJobs,cleaners,initialSel,onClearSel,
           console.log("[TurnReady] ✅ Job saved to Supabase:",saved.id);
         } else {
           console.error("[TurnReady] ❌ createJob returned null");
-          alert("Job assigned but failed to save to database. Check console for details.");
         }
       }).catch(function(e){
         console.error("[TurnReady] ❌ createJob failed:",e.message,e);
-        alert("Job save error: "+e.message+"\n\ncleanerId: "+cleanerId+"\npropId: "+propId);
       });
 
       // Save notification to Supabase for the cleaner
@@ -7000,33 +6998,80 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
           <div>
             {pendingJobs.map(function(job){
               var isPending=job.status==="pending_acceptance";
+              var isAccepted=job.status==="accepted";
+              var isInProgress=job.status==="in_progress";
               return(
-                <div key={job.id} style={{background:C.card,borderRadius:12,marginBottom:14,overflow:"hidden",border:"1px solid "+(isPending?"rgba(245,158,11,.4)":C.border)}}>
+                <div key={job.id} style={{background:C.card,borderRadius:12,marginBottom:14,overflow:"hidden",border:"1px solid "+(isPending?"rgba(245,158,11,.4)":isAccepted?"rgba(34,197,94,.3)":C.border)}}>
                   <div style={{padding:"14px 16px"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                       <div style={{fontWeight:700,fontSize:15}}>{job.propertyName||"Property"}</div>
                       <span style={{background:"rgba(34,197,94,.15)",color:"#22C55E",fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10}}>{fmt(job.pay||0)}</span>
                     </div>
-                    {job.scheduledDate&&<div style={{fontSize:12,color:"#888",marginBottom:6}}>📅 {job.scheduledDate}{job.scheduledTime?" at "+job.scheduledTime:""}</div>}
+                    {(job.scheduledDate||job.date)&&<div style={{fontSize:12,color:"#888",marginBottom:8}}>📅 {job.scheduledDate||job.date}{(job.scheduledTime||job.time)?" at "+(job.scheduledTime||job.time):""}</div>}
                     {isPending&&(
                       <div style={{background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.3)",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
-                        <div style={{fontSize:12,color:"#F59E0B",fontWeight:700,marginBottom:6}}>⏳ Awaiting your response — 8 hour window</div>
+                        <div style={{fontSize:12,color:"#F59E0B",fontWeight:700,marginBottom:8}}>⏳ Awaiting your response — 8 hour window</div>
                         <div style={{display:"flex",gap:8}}>
                           <button onClick={function(){
                             setJobs(function(js){return js.map(function(j){return j.id!==job.id?j:Object.assign({},j,{status:"accepted"});});});
                             if(job.id&&job.id.includes("-")){updateJob(job.id,{status:"accepted"}).catch(function(){});}
-                            addNotification&&addNotification({type:"accepted",icon:"✅",title:"Job Accepted!",body:"You accepted the job at "+job.propertyName+".",forRole:"cleaner",navTo:"My Jobs",time:new Date().toISOString(),read:false});
-                          }} style={{flex:1,background:"#22C55E",border:"none",borderRadius:6,padding:"9px",color:"#FFF",fontSize:12,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",touchAction:"manipulation"}}>✓ ACCEPT</button>
+                            // Load property data from Supabase so cleaner can start the job
+                            if(job.propertyId&&job.propertyId.includes("-")){
+                              getPropertyFull(job.propertyId).then(function(full){
+                                var propData={
+                                  id:job.propertyId,name:job.propertyName,pay:job.pay||0,
+                                  tasks:full.tasks||[],rooms:full.rooms||[],inventory:full.inventory||[],
+                                  cleanerPhotos:full.cleanerPhotos||[],cleanerNotes:full.cleanerNotes||"",
+                                  schedule:[{id:"job_"+job.id,cleanerId:user.id,status:"accepted",date:job.scheduledDate||job.date,time:job.scheduledTime||job.time,pay:job.pay}],
+                                  _fullLoaded:true,photo:null,address:"",bedrooms:0,bathrooms:0,
+                                };
+                                setProps(function(ps){
+                                  if(ps.find(function(p){return p.id===job.propertyId;}))return ps;
+                                  return ps.concat([propData]);
+                                });
+                              }).catch(function(e){console.error("Property load failed:",e.message);});
+                            }
+                            addNotification&&addNotification({type:"accepted",icon:"✅",title:"Job Accepted!",body:"You accepted the job at "+(job.propertyName||"property")+".",forRole:"cleaner",navTo:"My Jobs",time:new Date().toISOString(),read:false});
+                          }} style={{flex:1,background:"#22C55E",border:"none",borderRadius:6,padding:"10px",color:"#FFF",fontSize:12,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",touchAction:"manipulation"}}>✓ ACCEPT</button>
                           <button onClick={function(){
                             setJobs(function(js){return js.map(function(j){return j.id!==job.id?j:Object.assign({},j,{status:"declined"});});});
                             if(job.id&&job.id.includes("-")){updateJob(job.id,{status:"declined"}).catch(function(){});}
-                          }} style={{flex:1,background:"transparent",border:"1px solid #EF4444",borderRadius:6,padding:"9px",color:"#EF4444",fontSize:12,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",touchAction:"manipulation"}}>✗ DECLINE</button>
+                          }} style={{flex:1,background:"transparent",border:"1px solid #EF4444",borderRadius:6,padding:"10px",color:"#EF4444",fontSize:12,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",touchAction:"manipulation"}}>✗ DECLINE</button>
                         </div>
                       </div>
                     )}
-                    {!isPending&&(
-                      <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#22C55E",fontWeight:700}}>
-                        ✅ Accepted — your manager will share property details
+                    {(isAccepted||isInProgress)&&(
+                      <div>
+                        <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#22C55E",fontWeight:700,marginBottom:8}}>
+                          ✅ {isInProgress?"In Progress":"Accepted — ready to start"}
+                        </div>
+                        {job.propertyId&&job.propertyId.includes("-")&&(
+                          <button onClick={function(){
+                            // Load property and open job
+                            getPropertyFull(job.propertyId).then(function(full){
+                              var propData={
+                                id:job.propertyId,name:job.propertyName,pay:job.pay||0,
+                                tasks:full.tasks||[],rooms:full.rooms||[],inventory:full.inventory||[],
+                                cleanerPhotos:full.cleanerPhotos||[],cleanerNotes:full.cleanerNotes||"",
+                                schedule:[{id:"job_"+job.id,cleanerId:user.id,status:"accepted",date:job.scheduledDate||job.date,time:job.scheduledTime||job.time,pay:job.pay}],
+                                _fullLoaded:true,photo:null,address:"",bedrooms:0,bathrooms:0,
+                              };
+                              setProps(function(ps){
+                                var existing=ps.findIndex(function(p){return p.id===job.propertyId;});
+                                if(existing>=0){
+                                  var updated=ps.slice();updated[existing]=Object.assign({},ps[existing],propData);return updated;
+                                }
+                                return ps.concat([propData]);
+                              });
+                              setActiveId(job.propertyId);
+                              setActiveTab("tasks");
+                            }).catch(function(e){
+                              alert("Could not load property details: "+e.message);
+                            });
+                          }} style={{width:"100%",background:"#CC0000",border:"none",borderRadius:8,padding:"11px",color:"#FFF",fontSize:13,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",touchAction:"manipulation",letterSpacing:.3}}>
+                            {isInProgress?"▶ CONTINUE JOB →":"▶ START JOB →"}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
