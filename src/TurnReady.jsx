@@ -3180,10 +3180,11 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
       });
     });});
 
-    // Save job to Supabase so cleaner sees it on their dashboard
-    if(cleanerId&&propId&&propId.includes("-")&&cleanerId.includes("-")){
+    // Save job to Supabase so cleaner sees it — only require cleanerId to be a real UUID
+    if(cleanerId&&cleanerId.includes("-")){
+      console.log("[TurnReady] Saving job to Supabase — propId:",propId,"cleanerId:",cleanerId);
       var dbJob={
-        property_id:propId,
+        property_id:propId&&propId.includes("-")?propId:null,
         property_name:theProp.name,
         cleaner_id:cleanerId,
         cleaner_id2:twoCleanerData&&twoCleanerData.cid2?twoCleanerData.cid2:null,
