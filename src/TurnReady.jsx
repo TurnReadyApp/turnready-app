@@ -7823,10 +7823,28 @@ function CleanerEarnings({user,cleaners,jobs}){
                 <div style={{fontSize:10,color:"#555",marginTop:2}}>Payments arrive within 1-2 business days after approval</div>
               </div>
             )}
-            {cl.stripeStatus==="pending"&&(
+            {(cl.stripeStatus==="pending"||cl.stripeStatus==="pending_verification")&&(
               <div>
-                <div style={{fontSize:11,color:"#F59E0B",fontWeight:700}}>⏳ Setup in progress</div>
-                <div style={{fontSize:10,color:"#555",marginTop:2}}>Check your email to complete Stripe onboarding and unlock payouts</div>
+                <div style={{fontSize:11,color:"#F59E0B",fontWeight:700}}>⏳ Setup in progress — action needed</div>
+                <div style={{fontSize:10,color:"#555",marginTop:2,marginBottom:8}}>You started Stripe onboarding but haven't finished. Tap below to complete it and unlock payouts.</div>
+                <button onClick={async function(){
+                  var btn=document.activeElement;
+                  if(btn){btn.disabled=true;btn.textContent="⏳ Opening Stripe...";}
+                  try{
+                    var result=await createStripeConnectAccount({
+                      userId:cl.id||user.id,
+                      userType:"cleaner",
+                      email:cl.email||user.email,
+                      name:cl.name||user.name,
+                    });
+                    window.location.href=result.onboardingUrl;
+                  }catch(e){
+                    if(btn){btn.disabled=false;btn.textContent="Complete Stripe Setup →";}
+                    alert("Error: "+e.message);
+                  }
+                }} style={{width:"100%",background:"#F59E0B",border:"none",borderRadius:8,padding:"10px",color:"#000",fontSize:12,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",touchAction:"manipulation",WebkitAppearance:"none"}}>
+                  Complete Stripe Setup →
+                </button>
               </div>
             )}
             {(!cl.stripeStatus||cl.stripeStatus==="not_connected")&&(
@@ -8052,9 +8070,39 @@ function ProfilePage({user,setUser,cleaners,setCleaners,jobs,setShowMgrStripe}){
           </div>
           <div>
             <div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Stripe Payout</div>
-            <div style={{fontSize:13,color:cl.stripeStatus==="connected"?"#22C55E":cl.stripeStatus==="pending"?"#F59E0B":"#EF4444"}}>
-              {cl.stripeStatus==="connected"?"💳 Connected ✓":cl.stripeStatus==="pending"?"⏳ Setup Pending":"❌ Not Connected"}
+            <div style={{fontSize:13,color:cl.stripeStatus==="connected"?"#22C55E":(cl.stripeStatus==="pending"||cl.stripeStatus==="pending_verification")?"#F59E0B":"#EF4444",marginBottom:(cl.stripeStatus==="pending"||cl.stripeStatus==="pending_verification")?8:0}}>
+              {cl.stripeStatus==="connected"?"💳 Connected ✓":(cl.stripeStatus==="pending"||cl.stripeStatus==="pending_verification")?"⏳ Setup Pending":"❌ Not Connected"}
             </div>
+            {(cl.stripeStatus==="pending"||cl.stripeStatus==="pending_verification")&&(
+              <button onClick={async function(){
+                var btn=document.activeElement;
+                if(btn){btn.disabled=true;btn.textContent="⏳ Opening...";}
+                try{
+                  var result=await createStripeConnectAccount({userId:user.id,userType:"cleaner",email:user.email,name:user.name});
+                  window.location.href=result.onboardingUrl;
+                }catch(e){
+                  if(btn){btn.disabled=false;btn.textContent="Complete Stripe Setup →";}
+                  alert("Error: "+e.message);
+                }
+              }} style={{width:"100%",background:"#F59E0B",border:"none",borderRadius:8,padding:"10px",color:"#000",fontSize:11,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",touchAction:"manipulation",WebkitAppearance:"none"}}>
+                Complete Stripe Setup →
+              </button>
+            )}
+            {(!cl.stripeStatus||cl.stripeStatus==="not_connected")&&(
+              <button onClick={async function(){
+                var btn=document.activeElement;
+                if(btn){btn.disabled=true;btn.textContent="⏳ Opening...";}
+                try{
+                  var result=await createStripeConnectAccount({userId:user.id,userType:"cleaner",email:user.email,name:user.name});
+                  window.location.href=result.onboardingUrl;
+                }catch(e){
+                  if(btn){btn.disabled=false;btn.textContent="Connect Stripe →";}
+                  alert("Error: "+e.message);
+                }
+              }} style={{width:"100%",background:"#635BFF",border:"none",borderRadius:8,padding:"10px",color:"#FFF",fontSize:11,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",marginTop:6,touchAction:"manipulation",WebkitAppearance:"none"}}>
+                Connect Stripe →
+              </button>
+            )}
           </div>
         </div>
       )}
