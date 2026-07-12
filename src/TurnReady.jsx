@@ -5491,6 +5491,8 @@ function CleanerDashboard({user,cleaners,jobs,props,setView}){
   var myJobs=jobs.filter(function(j){return j.cleanerId===user.id;});
   var earned=myJobs.filter(function(j){return j.status==="approved";}).reduce(function(s,j){return s+j.pay;},0);
   var pending=myJobs.filter(function(j){return j.status==="pending_approval";});
+  // Jobs waiting for acceptance — from Supabase jobs table
+  var pendingAcceptance=myJobs.filter(function(j){return j.status==="pending_acceptance";});
   var myProps=(props||[]).filter(function(p){
     var inSchedule=(p.schedule||[]).some(function(s){
       return s.cleanerId===user.id||s.cleanerId2===user.id;
@@ -5654,6 +5656,26 @@ function CleanerDashboard({user,cleaners,jobs,props,setView}){
         </div>
       )}
 
+      {/* 📋 PENDING ACCEPTANCE — new jobs assigned, waiting for cleaner to accept */}
+      {pendingAcceptance.length>0&&(
+        <div style={{marginBottom:14}}>
+          {pendingAcceptance.map(function(job){return(
+            <div key={job.id} onClick={function(){setView("My Jobs");}}
+              style={{background:"rgba(204,0,0,.08)",border:"1px solid rgba(204,0,0,.5)",borderRadius:12,padding:"12px 14px",marginBottom:8,cursor:"pointer"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:20}}>📋</span>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:"Arial Black,sans-serif",fontSize:12,fontWeight:900,color:"#CC0000",letterSpacing:.3}}>NEW JOB — ACTION NEEDED</div>
+                  <div style={{fontSize:11,color:"#888",marginTop:1}}>{job.propertyName||"Property"}{job.scheduledDate?" · "+job.scheduledDate:""}</div>
+                  <div style={{fontSize:11,color:"#FFF",marginTop:3}}>Accept or decline within 8 hours</div>
+                </div>
+                <div style={{fontSize:10,color:"#CC0000",fontWeight:700}}>TAP →</div>
+              </div>
+            </div>
+          );})}
+        </div>
+      )}
+
       {/* Quick Tips */}
       <QuickTip/>
     </div>
@@ -5686,13 +5708,15 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
     return function(){clearInterval(interval);};
   },[jobStarted]);
 
-  // Get props assigned to this cleaner via schedule slots
-  // Only show properties assigned to this cleaner
+  // Get props assigned to this cleaner via schedule slots OR jobs table
+  var myPendingJobIds=(jobs||[]).filter(function(j){return j.cleanerId===user.id&&j.status==="pending_acceptance";}).map(function(j){return j.propertyId;});
   var myProps=(props||[]).filter(function(p){
     var inSchedule=(p.schedule||[]).some(function(s){
       return s.cleanerId===user.id||s.cleanerId2===user.id;
     });
-    return inSchedule||p.assignedTo===user.id;
+    // Also include if there's a pending_acceptance job for this property
+    var hasPendingJob=myPendingJobIds.indexOf(p.id)>=0;
+    return inSchedule||p.assignedTo===user.id||hasPendingJob;
   });
 
   function startJob(prop){
@@ -7209,14 +7233,34 @@ function Messages({user,cleaners,addNotification}){
       return updated;
     });
     setInput("");
-    // Notify the recipient
+    // Save notification to Supabase so it appears on the recipient's device
+    if(user&&user.id&&user.id.includes("-")){
+      if(isManager&&selCleaner&&selCleaner.id&&selCleaner.id.includes("-")){
+        // Manager → cleaner: save notification for cleaner
+        createNotification({
+          user_id:selCleaner.id,
+          type:"message",icon:"💬",
+          title:"New Message from "+user.name,
+          body:(newMsg.text||"").slice(0,80),
+          read:false,
+        }).catch(function(){});
+      } else if(!isManager&&user.manager_id&&user.manager_id.includes("-")){
+        // Cleaner → manager: save notification for manager
+        createNotification({
+          user_id:user.manager_id,
+          type:"message",icon:"💬",
+          title:"New Message from "+user.name,
+          body:(newMsg.text||"").slice(0,80),
+          read:false,
+        }).catch(function(){});
+      }
+    }
+    // Local notification for sender's own device feedback
     if(addNotification){
       if(isManager){
-        // Manager messaging cleaner - notify that cleaner (#35 reverse: manager->cleaner)
-        addNotification({type:"message",icon:"💬",title:"Message from Harvey",body:input.trim().slice(0,60)+(input.trim().length>60?"...":""),forRole:"cleaner",forCleaner:selCleaner.id,navTo:"Messages",time:new Date().toISOString(),read:false});
+        addNotification({type:"message",icon:"💬",title:"Message from "+user.name,body:(newMsg.text||"").slice(0,60),forRole:"cleaner",forCleaner:selCleaner.id,navTo:"Messages",time:new Date().toISOString(),read:false});
       } else {
-        // Cleaner messaging manager - notify manager (#33)
-        addNotification({type:"message",icon:"💬",title:"New Message from "+user.name,body:input.trim().slice(0,60)+(input.trim().length>60?"...":""),forRole:"manager",navTo:"Messages",time:new Date().toISOString(),read:false});
+        addNotification({type:"message",icon:"💬",title:"New Message from "+user.name,body:(newMsg.text||"").slice(0,60),forRole:"manager",navTo:"Messages",time:new Date().toISOString(),read:false});
       }
     }
   }
@@ -9585,6 +9629,13 @@ export default function App() {
               setNotifications(mapped);
             }
           }).catch(function(e){console.error("Notifications load:",e.message);});
+          // Subscribe to real-time notifications so bell updates without refreshing
+          subscribeToNotifications(profile.id,function(newNotif){
+            setNotifications(function(prev){
+              var mapped=Object.assign({},newNotif,{forRole:newNotif.for_role,navTo:newNotif.nav_to});
+              return [mapped].concat(prev).slice(0,50);
+            });
+          });
         }
         // Map DB field names to app field names
         var mappedProfile=Object.assign({},profile,{
