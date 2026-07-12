@@ -14,7 +14,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 
 export async function signUp({ email, password, name, role, inviteCode, phone, plan }) {
-  // 1. Create auth user
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: email.trim().toLowerCase(),
     password
@@ -26,7 +25,6 @@ export async function signUp({ email, password, name, role, inviteCode, phone, p
   const avatarInitials = name.trim().split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase()
   const now = new Date().toISOString()
 
-  // 2. Insert profile into users table
   const profileData = {
     id: userId,
     email: email.trim().toLowerCase(),
@@ -42,14 +40,10 @@ export async function signUp({ email, password, name, role, inviteCode, phone, p
   }
 
   if (role === 'manager') {
-    // Managers get their OWN invite code (generated in app and passed here)
-    // and a trial start date
     profileData.invite_code = inviteCode || null
     profileData.plan = plan || 'pro'
     profileData.trial_start = now
   } else if (role === 'cleaner') {
-    // Cleaners store the manager's invite code they used to sign up
-    // manager_id gets set separately after looking up who owns the code
     profileData.invite_code = inviteCode || null
     profileData.plan = null
   }
@@ -122,20 +116,7 @@ export async function updateUserProfile(userId, updates) {
   return data
 }
 
-export async function getCleanersByInviteCode(inviteCode) {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('invite_code', inviteCode)
-    .eq('role', 'manager')
-    .single()
-  if (error) return null
-  return data
-}
-
 export async function getTeamCleaners(managerId) {
-  // Get cleaners linked to this manager via manager_id column
-  // Falls back to invite_code match for legacy cleaners who signed up before manager_id was set
   const { data: byManagerId, error: e1 } = await supabase
     .from('users')
     .select('*')
@@ -147,7 +128,6 @@ export async function getTeamCleaners(managerId) {
     return byManagerId
   }
 
-  // Legacy fallback: get manager's invite code, then find cleaners who used it
   const { data: mgr } = await supabase
     .from('users')
     .select('invite_code')
@@ -170,14 +150,12 @@ export async function getTeamCleaners(managerId) {
 // ── PROPERTIES ────────────────────────────────────────────────────────────────
 
 export async function getProperties(managerId) {
-  // Load ONLY metadata first - no JSONB blobs (videos/photos make rows huge)
   const { data, error } = await supabase
     .from('properties')
     .select('id,manager_id,name,address,type,pay,bedrooms,bathrooms,photo,notes,check_in,check_out,same_day,access_code,supply_info,alarm_code,linen_rate,total_beds,linen_bags,assigned_to,guest_rating,created_at,schedule')
     .eq('manager_id', managerId)
     .order('created_at', { ascending: true })
   if (error) throw error
-  // Map columns back to app field names - tasks/rooms/inventory load lazily
   return (data || []).map(p => ({
     ...p,
     tasks: p.tasks_data || [],
@@ -201,7 +179,6 @@ export async function getProperties(managerId) {
 }
 
 export async function createProperty(property) {
-  // Map app field names to DB column names
   const dbProp = {
     manager_id: property.manager_id,
     name: property.name,
@@ -239,9 +216,7 @@ export async function createProperty(property) {
   return data
 }
 
-
 export async function getPropertyFull(propertyId) {
-  // Load full property data including JSONB blobs (for when user opens a property)
   const { data, error } = await supabase
     .from('properties')
     .select('id,tasks_data,rooms_data,inventory_data,cleaner_photos,linen_bag_photos,cleaner_notes')
@@ -260,7 +235,6 @@ export async function getPropertyFull(propertyId) {
 }
 
 export async function updateProperty(id, updates) {
-  // Map app field names to DB column names
   const dbUpdates = {}
   if (updates.name !== undefined) dbUpdates.name = updates.name
   if (updates.address !== undefined) dbUpdates.address = updates.address
@@ -380,7 +354,6 @@ export async function updateJob(id, updates) {
 }
 
 export async function getPendingJobs(managerId) {
-  // Get all jobs for properties owned by this manager
   const { data, error } = await supabase
     .from('jobs')
     .select(`*, properties!inner(manager_id)`)
@@ -471,7 +444,6 @@ export async function uploadFile(bucket, path, file) {
 }
 
 export async function uploadBase64(bucket, path, base64String, mimeType) {
-  // Convert base64 to blob for upload
   const base64Data = base64String.split(',')[1]
   const byteCharacters = atob(base64Data)
   const byteNumbers = new Array(byteCharacters.length)
@@ -533,10 +505,9 @@ export function subscribeToSlotUpdates(cleanerId, callback) {
     .subscribe()
 }
 
-// ── STORAGE UPLOAD ─────────────────────────────────────────────────────────────
+// ── STORAGE UPLOAD ────────────────────────────────────────────────────────────
 
 export async function uploadVideoToStorage(bucket, path, base64DataUrl, mimeType) {
-  // Convert base64 data URL to a Blob
   const base64Data = base64DataUrl.split(',')[1]
   const byteCharacters = atob(base64Data)
   const byteNumbers = new Array(byteCharacters.length)
@@ -545,29 +516,28 @@ export async function uploadVideoToStorage(bucket, path, base64DataUrl, mimeType
   }
   const byteArray = new Uint8Array(byteNumbers)
   const blob = new Blob([byteArray], { type: mimeType || 'video/mp4' })
-  
+
   const { data, error } = await supabase.storage
     .from(bucket)
-    .upload(path, blob, { 
-      cacheControl: '3600', 
+    .upload(path, blob, {
+      cacheControl: '3600',
       upsert: true,
       contentType: mimeType || 'video/mp4'
     })
-  
+
   if (error) throw error
-  
+
   const { data: { publicUrl } } = supabase.storage
     .from(bucket)
     .getPublicUrl(path)
-  
+
   return publicUrl
 }
 
 export async function uploadImageToStorage(bucket, path, base64DataUrl) {
-  // Determine mime type
   const mimeMatch = base64DataUrl.match(/data:([^;]+);/)
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg'
-  
+
   const base64Data = base64DataUrl.split(',')[1]
   const byteCharacters = atob(base64Data)
   const byteNumbers = new Array(byteCharacters.length)
@@ -576,27 +546,28 @@ export async function uploadImageToStorage(bucket, path, base64DataUrl) {
   }
   const byteArray = new Uint8Array(byteNumbers)
   const blob = new Blob([byteArray], { type: mimeType })
-  
+
   const { data, error } = await supabase.storage
     .from(bucket)
-    .upload(path, blob, { 
-      cacheControl: '3600', 
+    .upload(path, blob, {
+      cacheControl: '3600',
       upsert: true,
       contentType: mimeType
     })
-  
+
   if (error) throw error
-  
+
   const { data: { publicUrl } } = supabase.storage
     .from(bucket)
     .getPublicUrl(path)
-  
+
   return publicUrl
 }
 
 export function isStorageUrl(str) {
   return str && (str.startsWith('http://') || str.startsWith('https://'))
 }
+
 // ── STRIPE CONNECT ────────────────────────────────────────────────────────────
 
 export async function createStripeConnectAccount({ userId, userType, email, name, businessName }) {
@@ -604,10 +575,10 @@ export async function createStripeConnectAccount({ userId, userType, email, name
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, userType, email, name, businessName }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Failed to create Stripe account');
-  return data;
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error || 'Failed to create Stripe account')
+  return data
 }
 
 export async function payCleanerStripe({ cleanerStripeAccountId, amountCents, jobId, propertyName, managerId }) {
@@ -615,10 +586,10 @@ export async function payCleanerStripe({ cleanerStripeAccountId, amountCents, jo
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cleanerStripeAccountId, amountCents, jobId, propertyName, managerId }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Payment failed');
-  return data;
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error || 'Payment failed')
+  return data
 }
 
 export async function createStripeCheckoutSession({ managerId, managerEmail, managerName, businessName, plan, stripeCustomerId }) {
@@ -626,20 +597,20 @@ export async function createStripeCheckoutSession({ managerId, managerEmail, man
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ managerId, managerEmail, managerName, businessName, plan, stripeCustomerId }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Failed to create checkout session');
-  return data;
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error || 'Failed to create checkout session')
+  return data
 }
 
 export async function getCleanersByInviteCode(inviteCode) {
-  if (!inviteCode) return null;
+  if (!inviteCode) return null
   const { data, error } = await supabase
     .from('users')
     .select('id, name, email, business_name, invite_code')
     .eq('role', 'manager')
     .eq('invite_code', inviteCode.trim().toUpperCase())
-    .single();
-  if (error) return null;
-  return data;
+    .single()
+  if (error) return null
+  return data
 }
