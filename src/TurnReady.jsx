@@ -9722,24 +9722,81 @@ export default function App() {
         if(profile.role==="cleaner"){
           setView("Home");
           // Load cleaner's jobs from Supabase
-          getJobs({cleanerId:profile.id}).then(function(dbJobs){
-            if(dbJobs&&dbJobs.length>0){
-              var mappedJobs=dbJobs.map(function(j){
-                return Object.assign({},j,{
-                  dbId:j.id,id:j.id,
-                  propertyId:j.property_id,propertyName:j.property_name,
-                  cleanerId:j.cleaner_id,
-                  status:j.status||"pending_acceptance",
-                  scheduledDate:j.scheduled_date,scheduledTime:j.scheduled_time,
-                  completedAt:j.completed_at,paidAt:j.paid_at,startedAt:j.started_at,
-                  pay:j.pay||0,pay1:j.pay1,pay2:j.pay2,
-                  twoCleaners:j.two_cleaners||false,
-                  tasks:j.tasks||[],inventory:j.inventory||[],uploads:j.uploads||[],
+          function loadCleanerJobs(){
+            getJobs({cleanerId:profile.id}).then(function(dbJobs){
+              console.log("[TurnReady] Cleaner jobs loaded:",dbJobs&&dbJobs.length,"jobs for",profile.id);
+              if(dbJobs&&dbJobs.length>0){
+                var mappedJobs=dbJobs.map(function(j){
+                  return Object.assign({},j,{
+                    dbId:j.id,id:j.id,
+                    propertyId:j.property_id,propertyName:j.property_name,
+                    cleanerId:j.cleaner_id,
+                    status:j.status||"pending_acceptance",
+                    scheduledDate:j.scheduled_date,scheduledTime:j.scheduled_time,
+                    completedAt:j.completed_at,paidAt:j.paid_at,startedAt:j.started_at,
+                    pay:j.pay||0,pay1:j.pay1,pay2:j.pay2,
+                    twoCleaners:j.two_cleaners||false,
+                    tasks:j.tasks||[],inventory:j.inventory||[],uploads:j.uploads||[],
+                  });
+                });
+                setJobs(mappedJobs);
+              }
+            }).catch(function(e){console.error("Cleaner jobs load failed:",e.message);});
+          }
+          loadCleanerJobs();
+          // Subscribe to real-time job assignments so cleaner sees new jobs without refreshing
+          supabase
+            .channel("cleaner-jobs-"+profile.id)
+            .on("postgres_changes",{
+              event:"INSERT",schema:"public",table:"jobs",
+              filter:"cleaner_id=eq."+profile.id,
+            },function(payload){
+              console.log("[TurnReady] New job assigned via realtime:",payload.new);
+              var j=payload.new;
+              var newJob={
+                dbId:j.id,id:j.id,
+                propertyId:j.property_id,propertyName:j.property_name,
+                cleanerId:j.cleaner_id,
+                status:j.status||"pending_acceptance",
+                scheduledDate:j.scheduled_date,scheduledTime:j.scheduled_time,
+                pay:j.pay||0,pay1:j.pay1,pay2:j.pay2,
+                twoCleaners:j.two_cleaners||false,
+                tasks:[],inventory:[],uploads:[],
+              };
+              setJobs(function(prev){
+                // Don't add duplicates
+                if(prev.find(function(x){return x.id===newJob.id;}))return prev;
+                return [newJob].concat(prev);
+              });
+              // Add local notification
+              setNotifications(function(prev){
+                return [{
+                  id:"notif"+Date.now(),type:"assigned",icon:"📋",
+                  title:"New Job Assigned!",
+                  body:"You have been assigned to clean "+(j.property_name||"a property")+(j.scheduled_date?" on "+j.scheduled_date:"")+". Tap to accept.",
+                  forRole:"cleaner",navTo:"My Jobs",
+                  time:new Date().toISOString(),read:false,
+                }].concat(prev).slice(0,50);
+              });
+            })
+            .on("postgres_changes",{
+              event:"UPDATE",schema:"public",table:"jobs",
+              filter:"cleaner_id=eq."+profile.id,
+            },function(payload){
+              var j=payload.new;
+              setJobs(function(prev){
+                return prev.map(function(job){
+                  return job.id!==j.id?job:Object.assign({},job,{
+                    status:j.status,
+                    scheduledDate:j.scheduled_date,
+                    pay:j.pay||job.pay,
+                  });
                 });
               });
-              setJobs(mappedJobs);
-            }
-          }).catch(function(e){console.error("Cleaner jobs load failed:",e.message);});
+            })
+            .subscribe(function(status){
+              console.log("[TurnReady] Cleaner job subscription:",status);
+            });
         }
         if(profile.role==="manager"){
           setView("Dashboard");
