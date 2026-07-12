@@ -9987,10 +9987,10 @@ export default function App() {
             }
           }} cleaners={cleaners} setCleaners={setCleaners} pending={pendingCleaners} setPending={setPendingCleaners} inviteCode={INVITE_CODE}/></div>);
   
-  if(showOnboarding&&user&&user.role==="cleaner") return(
-    <div style={{minHeight:"100vh",background:C.bg,color:C.offWhite,fontFamily:"Inter,sans-serif",display:"flex",flexDirection:"column"}}>
+  if(showOnboarding&&onboardingStep==="welcome"&&user&&user.role==="cleaner") return(
+    <div style={{minHeight:"100vh",background:C.bg,color:C.offWhite,fontFamily:"Inter,sans-serif",display:"flex",flexDirection:"column",height:"100vh",overflow:"hidden"}}>
       <style>{css}</style>
-      <div style={{flex:1,overflowY:"auto",padding:"40px 24px 24px"}}>
+      <div style={{flex:1,overflowY:"auto",padding:"40px 24px 16px",WebkitOverflowScrolling:"touch"}}>
         <div style={{textAlign:"center",marginBottom:28}}>
           <div style={{fontSize:44,marginBottom:10}}>🧹</div>
           <div style={{fontSize:11,color:"#888",letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Step 1 of 2</div>
@@ -10016,13 +10016,17 @@ export default function App() {
           </div>
         );})}
       </div>
-      <div style={{padding:"16px 24px 32px"}}>
+      <div style={{padding:"16px 24px 32px",flexShrink:0,background:C.bg,borderTop:"1px solid #2A2A2A"}}>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          <button onClick={function(){setOnboardingStep("stripe");}}
+          <button
+            onTouchEnd={function(e){e.preventDefault();setOnboardingStep("stripe");}}
+            onClick={function(){setOnboardingStep("stripe");}}
             style={{width:"100%",background:"#CC0000",border:"none",borderRadius:10,padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",letterSpacing:.5,cursor:"pointer",WebkitAppearance:"none",touchAction:"manipulation"}}>
             NEXT: SET UP PAYMENTS →
           </button>
-          <button onClick={function(){setShowOnboarding(false);setOnboardingStep("welcome");setView("Home");}}
+          <button
+            onTouchEnd={function(e){e.preventDefault();setShowOnboarding(false);setOnboardingStep("welcome");setView("Home");}}
+            onClick={function(){setShowOnboarding(false);setOnboardingStep("welcome");setView("Home");}}
             style={{width:"100%",background:"transparent",border:"1px solid #333",borderRadius:10,padding:"12px",color:"#666",fontSize:12,cursor:"pointer",WebkitAppearance:"none",touchAction:"manipulation"}}>
             Skip — Go to the App
           </button>
