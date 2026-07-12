@@ -3200,7 +3200,6 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
       };
       createJob(dbJob).then(function(saved){
         if(saved){
-          // Add job to local state with the real DB id
           var localJob={
             id:saved.id,dbId:saved.id,
             propertyId:propId,propertyName:theProp.name,
@@ -3214,9 +3213,15 @@ function Properties({props,setProps,cleaners,initialSel,onClearSel,availability,
             assignedAt:new Date().toISOString(),
           };
           setJobs(function(js){return [localJob].concat(js);});
-          console.log("[TurnReady] Job saved to Supabase:",saved.id);
+          console.log("[TurnReady] ✅ Job saved to Supabase:",saved.id);
+        } else {
+          console.error("[TurnReady] ❌ createJob returned null");
+          alert("Job assigned but failed to save to database. Check console for details.");
         }
-      }).catch(function(e){console.error("[TurnReady] Job save failed:",e.message);});
+      }).catch(function(e){
+        console.error("[TurnReady] ❌ createJob failed:",e.message,e);
+        alert("Job save error: "+e.message+"\n\ncleanerId: "+cleanerId+"\npropId: "+propId);
+      });
 
       // Save notification to Supabase for the cleaner
       createNotification({
