@@ -469,7 +469,7 @@ const POLICIES = [
 ];
 
 var TEMPLATE_POLICIES = [
-  {num:"1",title:"Mission Statement",content:"[YOUR COMPANY NAME] is committed to delivering exceptional, 5-star guest experiences with every cleaning service. These standards ensure consistent, high-quality service across all properties and team members. Every cleaner is an ambassador of this brand.",items:[]},
+  {num:"1",title:"Mission Statement",content:"TurnReady is committed to delivering exceptional, 5-star guest experiences with every cleaning service. These standards ensure consistent, high-quality service across all properties and team members. Every cleaner is an ambassador of this brand.",items:[]},
   {num:"2",title:"Professional Communication Standards",content:"",items:[
     "Maintain professional and courteous communication with all clients, guests, and team members at all times.",
     "Check messages before departing for assignments and immediately after completion.",
@@ -531,7 +531,7 @@ var TEMPLATE_POLICIES = [
     "Payment is released after property owner inspection approval OR successful guest check-in confirmation.",
     "Payment Holds: Payment may be delayed or adjusted when property damage is reported, items are missing, or quality does not meet standards.",
     "Pay adjustments for quality failures: 20-50% reduction depending on severity.",
-    "Cleaners are responsible for their own tax obligations. [YOUR COMPANY NAME] is not responsible for cleaner tax filings.",
+    "Cleaners are responsible for their own tax obligations. TurnReady is not responsible for cleaner tax filings.",
     "Direct deposit via Stripe. Cleaners must maintain an active, verified bank account on file.",
   ]},
   {num:"11",title:"Professional Conduct and Additional Standards",content:"Standards that protect you, the clients, and the company.",items:[
@@ -542,7 +542,7 @@ var TEMPLATE_POLICIES = [
     "Respect for Property: Handle all client property with care. Do not use client amenities or bring unauthorized persons to assignments.",
     "Substance Policy: Arriving to an assignment under the influence of alcohol or drugs is grounds for immediate termination.",
   ]},
-  {num:"12",title:"Agreement and Acknowledgment",content:"By accepting assignments with [YOUR COMPANY NAME], all team members agree to:",items:[
+  {num:"12",title:"Agreement and Acknowledgment",content:"By accepting assignments with TurnReady, all team members agree to:",items:[
     "Follow all policies and procedures outlined in this document.",
     "Use the standard property checklist for every assignment without exception.",
     "Document pre-cleaning and post-cleaning conditions thoroughly on every job.",
@@ -5495,8 +5495,8 @@ function CleanerDashboard({user,cleaners,jobs,props,setView}){
   var myJobs=jobs.filter(function(j){return j.cleanerId===user.id;});
   var earned=myJobs.filter(function(j){return j.status==="approved";}).reduce(function(s,j){return s+j.pay;},0);
   var pending=myJobs.filter(function(j){return j.status==="pending_approval";});
-  // Jobs waiting for acceptance — from Supabase jobs table
   var pendingAcceptance=myJobs.filter(function(j){return j.status==="pending_acceptance";});
+  var inProgressJobs=myJobs.filter(function(j){return j.status==="in_progress"||j.status==="accepted";});
   var myProps=(props||[]).filter(function(p){
     var inSchedule=(p.schedule||[]).some(function(s){
       return s.cleanerId===user.id||s.cleanerId2===user.id;
@@ -5660,6 +5660,25 @@ function CleanerDashboard({user,cleaners,jobs,props,setView}){
         </div>
       )}
 
+      {/* 🔴 IN PROGRESS — active jobs */}
+      {inProgressJobs.length>0&&(
+        <div style={{marginBottom:14}}>
+          {inProgressJobs.map(function(job){return(
+            <div key={job.id} onClick={function(){setView("My Jobs");}}
+              style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.4)",borderRadius:12,padding:"12px 14px",marginBottom:8,cursor:"pointer"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:20}}>🧹</span>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:"Arial Black,sans-serif",fontSize:12,fontWeight:900,color:"#22C55E",letterSpacing:.3}}>● JOB IN PROGRESS</div>
+                  <div style={{fontSize:11,color:"#888",marginTop:1}}>{job.propertyName||"Property"}</div>
+                </div>
+                <div style={{fontSize:10,color:"#22C55E",fontWeight:700}}>CONTINUE →</div>
+              </div>
+            </div>
+          );})}
+        </div>
+      )}
+
       {/* 📋 PENDING ACCEPTANCE — new jobs assigned, waiting for cleaner to accept */}
       {pendingAcceptance.length>0&&(
         <div style={{marginBottom:14}}>
@@ -5757,29 +5776,61 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
     }
   }
 
+  // Debounce ref for task saving
+  var taskSaveTimer=useRef(null);
+
   function toggleTask(propId,taskId){
     setProps(function(ps){return ps.map(function(p){
       if(p.id!==propId)return p;
-      return Object.assign({},p,{tasks:(p.tasks||[]).map(function(t){return t.id===taskId?Object.assign({},t,{done:!t.done}):t;})});
+      var updatedTasks=(p.tasks||[]).map(function(t){return t.id===taskId?Object.assign({},t,{done:!t.done}):t;});
+      // Save tasks to Supabase debounced (800ms after last toggle)
+      if(propId&&propId.includes("-")){
+        if(taskSaveTimer.current)clearTimeout(taskSaveTimer.current);
+        taskSaveTimer.current=setTimeout(function(){
+          updateProperty(propId,{tasks:updatedTasks}).catch(function(e){console.error("Task save failed:",e.message);});
+          // Also save to active job in Supabase
+          var activeJobId=null;
+          setJobs(function(js){
+            var aj=js.find(function(j){return (j.propertyId===propId||j.property_id===propId)&&j.cleanerId===user.id&&(j.status==="in_progress"||j.status==="accepted");});
+            if(aj)activeJobId=aj.id||aj.dbId;
+            return js;
+          });
+          if(activeJobId&&activeJobId.includes("-")){
+            updateJob(activeJobId,{tasks:updatedTasks}).catch(function(e){console.error("Job task save failed:",e.message);});
+          }
+        },800);
+      }
+      return Object.assign({},p,{tasks:updatedTasks});
     });});
   }
 
   function updateInv(propId,invId,status){
     setProps(function(ps){return ps.map(function(p){
       if(p.id!==propId)return p;
-      var updated=Object.assign({},p,{inventory:(p.inventory||[]).map(function(i){return i.id===invId?Object.assign({},i,{cleanerStatus:status}):i;})});
+      var updatedInv=(p.inventory||[]).map(function(i){return i.id===invId?Object.assign({},i,{cleanerStatus:status}):i;});
+      // Save inventory to Supabase
+      if(propId&&propId.includes("-")){
+        updateProperty(propId,{inventory:updatedInv}).catch(function(e){console.error("Inventory save failed:",e.message);});
+        // Also save to active job
+        setJobs(function(js){
+          var aj=js.find(function(j){return (j.propertyId===propId||j.property_id===propId)&&j.cleanerId===user.id&&(j.status==="in_progress"||j.status==="accepted");});
+          if(aj&&(aj.id||aj.dbId)&&(aj.id||aj.dbId).includes("-")){
+            updateJob(aj.id||aj.dbId,{inventory:updatedInv}).catch(function(e){console.error("Job inv save:",e.message);});
+          }
+          return js;
+        });
+      }
       // Fire notification if item marked low
       if(status==="low"&&addNotification){
         var inv=(p.inventory||[]).find(function(i){return i.id===invId;});
         if(inv){
-          // Count how many props have this item low
           var lowCount=ps.filter(function(pp){return (pp.inventory||[]).some(function(ii){return ii.item===inv.item&&(ii.cleanerStatus==="low"||ii.inStock===0);});}).length+1;
           if(lowCount>=2){
             addNotification({type:"supply",icon:"📦",title:"Supply Alert: "+inv.item,body:inv.item+" is running low at "+p.name+(lowCount>2?" and "+(lowCount-1)+" other properties":""),forRole:"manager",navTo:"Properties",time:new Date().toISOString(),read:false});
           }
         }
       }
-      return updated;
+      return Object.assign({},p,{inventory:updatedInv});
     });});
   }
 
@@ -6295,25 +6346,54 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                   {((room.refPhotos&&room.refPhotos.length>0)||room.refVideo)&&(
                     <div style={{marginBottom:12}}>
                       <div style={{fontSize:10,color:C.red,fontWeight:700,letterSpacing:.5,marginBottom:8,textTransform:"uppercase"}}>📸 Reference — This is how it should look</div>
-                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <div style={{display:"flex",gap:8,overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:4}}>
                         {(room.refPhotos||[]).map(function(ph,i){
-                          return <img key={i} src={ph} alt={"ref "+(i+1)} 
+                          return <img key={i} src={ph} alt={"ref "+(i+1)}
                             onClick={function(){
+                              // Open swipeable gallery overlay
+                              var photos=room.refPhotos||[];
+                              var current={idx:i};
                               var overlay=document.createElement("div");
-                              overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:flex;align-items:center;justify-content:center;";
-                              overlay.onclick=function(){document.body.removeChild(overlay);};
-                              var img=document.createElement("img");
-                              img.src=ph;
-                              img.style.cssText="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;";
-                              var close=document.createElement("button");
-                              close.textContent="✕";
-                              close.style.cssText="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.2);border:none;color:#FFF;font-size:20px;width:36px;height:36px;border-radius:50%;cursor:pointer;";
-                              close.onclick=function(){document.body.removeChild(overlay);};
-                              overlay.appendChild(img);
-                              overlay.appendChild(close);
+                              overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.97);z-index:9999;display:flex;align-items:center;justify-content:center;touch-action:manipulation;";
+                              function render(){
+                                overlay.innerHTML="";
+                                var img=document.createElement("img");
+                                img.src=photos[current.idx];
+                                img.style.cssText="max-width:92vw;max-height:85vh;object-fit:contain;border-radius:8px;display:block;";
+                                overlay.appendChild(img);
+                                // Counter
+                                var counter=document.createElement("div");
+                                counter.textContent=(current.idx+1)+" / "+photos.length;
+                                counter.style.cssText="position:absolute;top:16px;left:50%;transform:translateX(-50%);color:#FFF;font-size:13px;font-weight:700;";
+                                overlay.appendChild(counter);
+                                // Close
+                                var close=document.createElement("button");
+                                close.textContent="✕";
+                                close.style.cssText="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.2);border:none;color:#FFF;font-size:18px;width:34px;height:34px;border-radius:50%;cursor:pointer;";
+                                close.onclick=function(){document.body.removeChild(overlay);};
+                                overlay.appendChild(close);
+                                // Prev arrow
+                                if(photos.length>1&&current.idx>0){
+                                  var prev=document.createElement("button");
+                                  prev.textContent="‹";
+                                  prev.style.cssText="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);border:none;color:#FFF;font-size:36px;width:44px;height:60px;border-radius:8px;cursor:pointer;";
+                                  prev.onclick=function(){current.idx--;render();};
+                                  overlay.appendChild(prev);
+                                }
+                                // Next arrow
+                                if(photos.length>1&&current.idx<photos.length-1){
+                                  var next=document.createElement("button");
+                                  next.textContent="›";
+                                  next.style.cssText="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);border:none;color:#FFF;font-size:36px;width:44px;height:60px;border-radius:8px;cursor:pointer;";
+                                  next.onclick=function(){current.idx++;render();};
+                                  overlay.appendChild(next);
+                                }
+                              }
+                              render();
+                              overlay.onclick=function(ev){if(ev.target===overlay)document.body.removeChild(overlay);};
                               document.body.appendChild(overlay);
                             }}
-                            style={{width:90,height:90,borderRadius:8,objectFit:"cover",flexShrink:0,cursor:"pointer"}}/>;
+                            style={{width:90,height:90,borderRadius:8,objectFit:"cover",flexShrink:0,cursor:"pointer",border:"1px solid #333"}}/>;
                         })}
                         {room.refVideo&&<video src={room.refVideo} controls style={{width:90,height:90,borderRadius:8,objectFit:"cover",flexShrink:0}}/>}
                       </div>
@@ -6485,7 +6565,15 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                 value={prop.cleanerNotes||""}
                 onChange={function(e){
                   if(!started)return;
-                  setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{cleanerNotes:e.target.value});});});
+                  var val=e.target.value;
+                  setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{cleanerNotes:val});});});
+                  // Save to Supabase so manager sees notes in real time
+                  if(prop.id&&prop.id.includes("-")){
+                    if(window._noteTimer)clearTimeout(window._noteTimer);
+                    window._noteTimer=setTimeout(function(){
+                      updateProperty(prop.id,{cleanerNotes:val}).catch(function(e){console.error("Notes save:",e.message);});
+                    },1000);
+                  }
                 }}
                 placeholder={started?"e.g. Found crack in bathroom mirror. Back door doesn't lock properly. Washer needs repair...":"Start the job first to add notes"}
                 rows={4}
@@ -7411,7 +7499,21 @@ function Messages({user,cleaners,addNotification}){
                       {m.media&&m.media.type==="image"&&(
                         <div style={{position:"relative",display:"inline-block",maxWidth:"100%"}}>
                           <img src={m.media.url} alt={m.media.name||"image"}
-                            style={{maxWidth:"100%",maxHeight:220,borderRadius:8,marginBottom:m.text?6:0,display:"block"}}/>
+                            onClick={function(){
+                              var overlay=document.createElement("div");
+                              overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.97);z-index:9999;display:flex;align-items:center;justify-content:center;";
+                              overlay.onclick=function(){document.body.removeChild(overlay);};
+                              var img=document.createElement("img");
+                              img.src=m.media.url;
+                              img.style.cssText="max-width:94vw;max-height:90vh;object-fit:contain;border-radius:8px;";
+                              var close=document.createElement("button");
+                              close.textContent="✕";
+                              close.style.cssText="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.2);border:none;color:#FFF;font-size:18px;width:34px;height:34px;border-radius:50%;cursor:pointer;";
+                              close.onclick=function(e){e.stopPropagation();document.body.removeChild(overlay);};
+                              overlay.appendChild(img);overlay.appendChild(close);
+                              document.body.appendChild(overlay);
+                            }}
+                            style={{maxWidth:"100%",maxHeight:220,borderRadius:8,marginBottom:m.text?6:0,display:"block",cursor:"pointer"}}/>
                           <button onClick={function(){downloadMedia(m.media.url,m.media.name||"image.jpg");}}
                             style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.75)",border:"none",borderRadius:6,color:"#FFF",fontSize:10,padding:"3px 8px",cursor:"pointer",fontWeight:700}}>⬇️</button>
                         </div>
