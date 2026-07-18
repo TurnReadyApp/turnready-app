@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { supabase, signIn, signUp, signOut, getCurrentUser, getUserProfile, updateUserProfile, getTeamCleaners, getProperties, getPropertyFull, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications, uploadVideoToStorage, uploadImageToStorage, isStorageUrl, createStripeConnectAccount, payCleanerStripe, createStripeCheckoutSession, getCleanersByInviteCode } from "./lib/supabase.js";
+import { supabase, signIn, signUp, signOut, getCurrentUser, getUserProfile, updateUserProfile, getTeamCleaners, getProperties, getPropertyFull, createProperty, updateProperty, deleteProperty, getJobs, createJob, updateJob, getMessages, sendMessage, subscribeToMessages, getNotifications, createNotification, subscribeToNotifications, uploadVideoToStorage, uploadImageToStorage, isStorageUrl, createStripeConnectAccount, payCleanerStripe, createStripeCheckoutSession, getCleanersByInviteCode, subscribeToPush, sendPushNotification, syncICal } from "./lib/supabase.js";
 
 
 
@@ -2864,6 +2864,9 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
               <button onClick={function(){setAddingDetail(true);}} style={{width:"100%",marginTop:12,background:"transparent",border:"1px dashed #444",borderRadius:8,color:"#888",fontSize:11,fontWeight:700,padding:"9px",cursor:"pointer"}}>+ ADD DETAIL</button>
             )
           )}
+
+          {/* 📅 iCal Sync — Airbnb/VRBO calendar */}
+          <ICalSyncPanel prop={prop} setProps={setProps} addNotification={addNotification}/>
         </div>
       )}
       {/* Fullscreen Gallery Modal */}
@@ -2933,6 +2936,76 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
 }
 
 // ─── PROPERTIES ───────────────────────────────────────────────────────────────
+// ── ICAL SYNC PANEL ──────────────────────────────────────────────────────────
+function ICalSyncPanel({prop,setProps,addNotification}){
+  const [icalUrl,setIcalUrl]=useState(prop.icalUrl||"");
+  const [icalStatus,setIcalStatus]=useState(null);
+  const [icalResult,setIcalResult]=useState(null);
+  const [icalError,setIcalError]=useState("");
+
+  return(
+    <div style={{marginTop:14,padding:"12px 0",borderTop:"1px solid #2A2A2A"}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+        <span style={{fontSize:13}}>📅</span>
+        <div style={{fontFamily:"Arial Black,sans-serif",fontSize:11,fontWeight:900,letterSpacing:.5,color:"#CC0000"}}>ICAL SYNC</div>
+        <div style={{fontSize:9,color:"#888",marginLeft:2}}>Airbnb · VRBO · any calendar</div>
+      </div>
+      <div style={{fontSize:11,color:"#888",marginBottom:8,lineHeight:1.5}}>Paste your Airbnb or VRBO iCal link to import checkout dates and auto-suggest cleaning jobs.</div>
+      <input
+        value={icalUrl}
+        onChange={function(e){setIcalUrl(e.target.value);}}
+        placeholder="https://www.airbnb.com/calendar/ical/..."
+        style={{width:"100%",background:"#2A2A2A",border:"1px solid #444",borderRadius:6,color:"#FFF",fontSize:11,padding:"7px 10px",outline:"none",marginBottom:8,boxSizing:"border-box",fontFamily:"Inter,sans-serif"}}
+      />
+      <button onClick={async function(){
+        if(!icalUrl.trim())return;
+        setIcalStatus("loading");setIcalError("");setIcalResult(null);
+        setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{icalUrl:icalUrl.trim()});});});
+        if(prop.id&&prop.id.includes("-")){
+          updateProperty(prop.id,{ical_url:icalUrl.trim()}).catch(function(){});
+        }
+        try{
+          var result=await syncICal(icalUrl.trim());
+          setIcalResult(result.bookings||[]);
+          setIcalStatus("success");
+        }catch(e){
+          setIcalStatus("error");setIcalError(e.message||"Sync failed");
+        }
+      }} disabled={icalStatus==="loading"||!icalUrl.trim()}
+        style={{width:"100%",background:icalUrl.trim()?"#CC0000":"#2A2A2A",border:"none",borderRadius:6,padding:"8px",color:icalUrl.trim()?"#FFF":"#555",fontSize:11,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:icalUrl.trim()?"pointer":"default",marginBottom:6,letterSpacing:.3}}>
+        {icalStatus==="loading"?"⏳ SYNCING...":"🔄 SYNC CALENDAR"}
+      </button>
+      {icalStatus==="error"&&<div style={{fontSize:11,color:"#EF4444",marginBottom:8}}>⚠️ {icalError}</div>}
+      {icalStatus==="success"&&icalResult&&(
+        <div>
+          <div style={{fontSize:11,color:"#22C55E",fontWeight:700,marginBottom:8}}>✅ {icalResult.length} booking{icalResult.length!==1?"s":""} found</div>
+          {icalResult.slice(0,6).map(function(b,i){
+            return(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #1A1A1A",fontSize:11}}>
+                <div style={{flex:1,minWidth:0,marginRight:8}}>
+                  <div style={{color:"#E8E8E8",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.summary||"Booked"}</div>
+                  <div style={{color:"#888",marginTop:2}}>Checkout: {b.checkOut} · <span style={{color:"#F59E0B",fontWeight:700}}>Clean: {b.cleanDate}</span></div>
+                </div>
+                <button onClick={function(){
+                  if(addNotification){
+                    addNotification({type:"ical_suggest",icon:"📅",
+                      title:"Clean suggested for "+b.cleanDate,
+                      body:prop.name+": guest checkout "+b.checkOut+". Schedule a clean for this date.",
+                      forRole:"manager",navTo:"Properties",time:new Date().toISOString(),read:false});
+                  }
+                }} style={{background:"rgba(204,0,0,.15)",border:"1px solid rgba(204,0,0,.3)",borderRadius:6,color:"#CC0000",fontSize:10,fontWeight:700,padding:"4px 8px",cursor:"pointer",flexShrink:0,fontFamily:"Arial Black,sans-serif"}}>
+                  + ASSIGN
+                </button>
+              </div>
+            );
+          })}
+          {icalResult.length>6&&<div style={{fontSize:10,color:"#888",marginTop:6,textAlign:"center"}}>+ {icalResult.length-6} more upcoming bookings</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Properties({props,setProps,jobs,setJobs,cleaners,initialSel,onClearSel,availability,addNotification,user}){
   const [sel,setSel]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
@@ -4099,7 +4172,7 @@ function Cleaners({cleaners,setCleaners,jobs,pendingCleaners,setPendingCleaners,
 }
 
 // ─── CALENDAR ─────────────────────────────────────────────────────────────────
-function Cal({props,cleaners,myId,onSelectProp,user,setView,setProps,availability,setAvailability}){
+function Cal({props,cleaners,jobs,myId,onSelectProp,user,setView,setProps,availability,setAvailability}){
   var today=new Date();
   const [month,setMonth]=useState(today.getMonth());
   const [year,setYear]=useState(today.getFullYear());
@@ -4118,16 +4191,34 @@ function Cal({props,cleaners,myId,onSelectProp,user,setView,setProps,availabilit
   var todayStr=today.getFullYear()+"-"+(String(today.getMonth()+1).padStart(2,"0"))+"-"+(String(today.getDate()).padStart(2,"0"));
 
   // Build job map: date -> [jobs]
+  // Source 1: props.schedule slots (manager-assigned via schedule array)
   var jobMap={};
   props.forEach(function(p){
     (p.schedule||[]).forEach(function(slot){
       if(!slot.date)return;
-      if(myId&&slot.cleanerId!==myId)return;
+      if(myId&&slot.cleanerId!==myId&&slot.cleanerId2!==myId)return;
       if(filterCleaner!=="all"&&slot.cleanerId!==filterCleaner)return;
       if(!jobMap[slot.date])jobMap[slot.date]=[];
       var cl=cleaners.find(function(c){return c.id===slot.cleanerId;})||{name:"Unassigned"};
       jobMap[slot.date].push({prop:p,slot:slot,cleaner:cl});
     });
+  });
+  // Source 2: jobs array (Supabase jobs — critical for cleaner view where props is empty)
+  (jobs||[]).forEach(function(j){
+    if(!j.status||j.status==="declined"||j.status==="approved"||j.status==="paid")return;
+    var jDate=j.scheduledDate||j.date;
+    if(!jDate)return;
+    if(myId&&j.cleanerId!==myId)return;
+    if(filterCleaner!=="all"&&j.cleanerId!==filterCleaner)return;
+    // Don't double-add if already from schedule
+    var existingProp=props.find(function(p){return p.id===j.propertyId;});
+    var alreadyAdded=existingProp&&(existingProp.schedule||[]).some(function(s){return s.date===jDate&&s.cleanerId===j.cleanerId;});
+    if(alreadyAdded)return;
+    if(!jobMap[jDate])jobMap[jDate]=[];
+    var cl=cleaners.find(function(c){return c.id===j.cleanerId;})||{name:"Cleaner"};
+    var fakeProp={id:j.propertyId,name:j.propertyName||"Property"};
+    var fakeSlot={id:j.id,cleanerId:j.cleanerId,date:jDate,time:j.scheduledTime||j.time||"11:00",status:j.status,pay:j.pay};
+    jobMap[jDate].push({prop:fakeProp,slot:fakeSlot,cleaner:cl,fromJobsTable:true});
   });
 
   function goToday(){
@@ -4560,7 +4651,21 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
         var newReview={rating:managerRating,comment:managerComment,date:new Date().toISOString(),property:ratingJob.propertyName};
         var allRatings=reviews.map(function(r){return r.rating;}).concat([managerRating]);
         var avgRating=allRatings.reduce(function(a,b){return a+b;},0)/allRatings.length;
-        return Object.assign({},c,{reviews:reviews.concat([newReview]),rating:Math.round(avgRating*10)/10});
+        var updatedReviews=reviews.concat([newReview]);
+        var newAvg=Math.round(avgRating*10)/10;
+        // Save to Supabase if real cleaner
+        if(ratingJob.cleanerId&&ratingJob.cleanerId.includes("-")){
+          updateUserProfile(ratingJob.cleanerId,{
+            reviews:updatedReviews,
+            rating:newAvg,
+          }).catch(function(e){console.error("Rating save failed:",e.message);});
+          // Save rating to the job record too
+          var realJobId=ratingJob.dbId||ratingJob.id;
+          if(realJobId&&realJobId.includes("-")){
+            updateJob(realJobId,{manager_rating:managerRating,manager_comment:managerComment}).catch(function(){});
+          }
+        }
+        return Object.assign({},c,{reviews:updatedReviews,rating:newAvg});
       });});
     }
     setRatingJob(null);
@@ -5720,7 +5825,21 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
   const [emergencyFiled,setEmergencyFiled]=useState({});
   const [jobsTab,setJobsTab]=useState("active");
   const [selectedHistory,setSelectedHistory]=useState(null);
-  const [jobStartTime,setJobStartTime]=useState({});
+  const [jobStartTime,setJobStartTime]=useState(function(){
+    // Restore any persisted job start times from localStorage
+    var restored={};
+    try{
+      var keys=Object.keys(localStorage);
+      keys.forEach(function(k){
+        if(k.startsWith("turnready_job_start_")){
+          var propId=k.replace("turnready_job_start_","");
+          var t=parseInt(localStorage.getItem(k),10);
+          if(t&&!isNaN(t))restored[propId]=t;
+        }
+      });
+    }catch(e){}
+    return restored;
+  });
   const [now,setNow]=useState(Date.now());
 
   // Live clock - updates every second when a job is in progress
@@ -5744,8 +5863,19 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
 
   function startJob(prop){
     var startT=Date.now();
+    var startISO=new Date(startT).toISOString();
     setJobStartTime(function(prev){var u=Object.assign({},prev);u[prop.id]=startT;return u;});
     setJobStarted(function(prev){var u=Object.assign({},prev);u[prop.id]=true;return u;});
+    // Persist start time to localStorage (survives page refresh)
+    try{localStorage.setItem("turnready_job_start_"+prop.id,String(startT));}catch(e){}
+    // Persist to Supabase — find active job for this property and save started_at
+    var activeJob=jobs.find(function(j){return (j.propertyId===prop.id||j.property_id===prop.id)&&j.cleanerId===user.id&&(j.status==="accepted"||j.status==="in_progress"||j.status==="pending_acceptance");});
+    if(activeJob){
+      var realJobId=activeJob.dbId||activeJob.id;
+      if(realJobId&&realJobId.includes("-")){
+        updateJob(realJobId,{status:"in_progress",started_at:startISO}).catch(function(e){console.error("startJob save failed:",e.message);});
+      }
+    }
     // Update slot status to in_progress AND clear inventory/task statuses for fresh start
     setProps(function(ps){return ps.map(function(pp){
       if(pp.id!==prop.id)return pp;
@@ -5910,6 +6040,10 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
     var jobHrs=Math.floor(jobDuration/3600);
     var jobMins=Math.floor((jobDuration%3600)/60);
     var jobDurationStr=jobHrs>0?(jobHrs+"h "+jobMins+"m"):(jobMins+"m");
+    // Clear persisted timer — job is done
+    try{localStorage.removeItem("turnready_job_start_"+prop.id);}catch(e){}
+    setJobStartTime(function(prev){var u=Object.assign({},prev);delete u[prop.id];return u;});
+    setJobStarted(function(prev){var u=Object.assign({},prev);delete u[prop.id];return u;});
     // Check if this is a 2-cleaner job
     var mySlot2=(prop.schedule||[]).find(function(s){return s.cleanerId===user.id||s.cleanerId2===user.id;});
     var isC1=mySlot2&&mySlot2.cleanerId===user.id;
@@ -6824,6 +6958,20 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                 if(addNotification){addNotification({type:"removal_request",icon:"⚠️",title:"Removal Request — "+user.name,
                   body:user.name+" is requesting removal from "+removeRequest.prop.name+" on "+(removeRequest.slot&&removeRequest.slot.date)+". Reason: "+fullReason,
                   forRole:"manager",navTo:"Approvals",time:new Date().toISOString(),read:false});}
+                // Save notification to Supabase for manager (real users)
+                if(user.manager_id&&user.manager_id.includes("-")){
+                  createNotification({
+                    user_id:user.manager_id,
+                    type:"removal_request",
+                    icon:"⚠️",
+                    title:"Removal Request — "+user.name,
+                    body:user.name+" is requesting removal from "+removeRequest.prop.name+" on "+(removeRequest.slot&&removeRequest.slot.date)+". Reason: "+fullReason,
+                    for_role:"manager",
+                    nav_to:"Approvals",
+                    time:new Date().toISOString(),
+                    read:false,
+                  }).catch(function(e){console.error("Removal notif save failed:",e.message);});
+                }
                 // Add to pendingRemovals list directly - more reliable than slot flags
                 if(setPendingRemovals){
                   setPendingRemovals(function(prev){
@@ -7107,11 +7255,20 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                             if(job.propertyId&&job.propertyId.includes("-")){
                               getPropertyFull(job.propertyId).then(function(full){
                                 var propData={
-                                  id:job.propertyId,name:job.propertyName,pay:job.pay||0,
+                                  id:job.propertyId,name:job.propertyName||full.name,pay:job.pay||full.pay||0,
                                   tasks:full.tasks||[],rooms:full.rooms||[],inventory:full.inventory||[],
-                                  cleanerPhotos:full.cleanerPhotos||[],cleanerNotes:full.cleanerNotes||"",
+                                  cleanerPhotos:full.cleanerPhotos||full.cleaner_photos||[],cleanerNotes:full.cleanerNotes||full.cleaner_notes||"",
+                                  photo:full.photo||null,address:full.address||"",
+                                  bedrooms:full.bedrooms||0,bathrooms:full.bathrooms||0,
+                                  totalBeds:full.totalBeds||full.total_beds||0,
+                                  checkIn:full.checkIn||full.check_in||"",checkOut:full.checkOut||full.check_out||"",
+                                  sameDay:full.sameDay||full.same_day||false,
+                                  accessCode:full.accessCode||full.access_code||"",
+                                  supplyInfo:full.supplyInfo||full.supply_info||"",
+                                  alarmCode:full.alarmCode||full.alarm_code||"",
+                                  notes:full.notes||"",
                                   schedule:[{id:"job_"+job.id,cleanerId:user.id,status:"accepted",date:job.scheduledDate||job.date,time:job.scheduledTime||job.time,pay:job.pay}],
-                                  _fullLoaded:true,photo:null,address:"",bedrooms:0,bathrooms:0,
+                                  _fullLoaded:true,
                                 };
                                 setProps(function(ps){
                                   if(ps.find(function(p){return p.id===job.propertyId;}))return ps;
@@ -7138,11 +7295,20 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                             // Load property and open job
                             getPropertyFull(job.propertyId).then(function(full){
                               var propData={
-                                id:job.propertyId,name:job.propertyName,pay:job.pay||0,
+                                id:job.propertyId,name:job.propertyName||full.name,pay:job.pay||full.pay||0,
                                 tasks:full.tasks||[],rooms:full.rooms||[],inventory:full.inventory||[],
-                                cleanerPhotos:full.cleanerPhotos||[],cleanerNotes:full.cleanerNotes||"",
+                                cleanerPhotos:full.cleanerPhotos||full.cleaner_photos||[],cleanerNotes:full.cleanerNotes||full.cleaner_notes||"",
+                                photo:full.photo||null,address:full.address||"",
+                                bedrooms:full.bedrooms||0,bathrooms:full.bathrooms||0,
+                                totalBeds:full.totalBeds||full.total_beds||0,
+                                checkIn:full.checkIn||full.check_in||"",checkOut:full.checkOut||full.check_out||"",
+                                sameDay:full.sameDay||full.same_day||false,
+                                accessCode:full.accessCode||full.access_code||"",
+                                supplyInfo:full.supplyInfo||full.supply_info||"",
+                                alarmCode:full.alarmCode||full.alarm_code||"",
+                                notes:full.notes||"",
                                 schedule:[{id:"job_"+job.id,cleanerId:user.id,status:"accepted",date:job.scheduledDate||job.date,time:job.scheduledTime||job.time,pay:job.pay}],
-                                _fullLoaded:true,photo:null,address:"",bedrooms:0,bathrooms:0,
+                                _fullLoaded:true,
                               };
                               setProps(function(ps){
                                 var existing=ps.findIndex(function(p){return p.id===job.propertyId;});
@@ -7291,6 +7457,20 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                 if(addNotification){addNotification({type:"removal_request",icon:"⚠️",title:"Removal Request — "+user.name,
                   body:user.name+" is requesting removal from "+removeRequest.prop.name+" on "+(removeRequest.slot&&removeRequest.slot.date)+". Reason: "+fullReason,
                   forRole:"manager",navTo:"Approvals",time:new Date().toISOString(),read:false});}
+                // Save notification to Supabase for manager (real users)
+                if(user.manager_id&&user.manager_id.includes("-")){
+                  createNotification({
+                    user_id:user.manager_id,
+                    type:"removal_request",
+                    icon:"⚠️",
+                    title:"Removal Request — "+user.name,
+                    body:user.name+" is requesting removal from "+removeRequest.prop.name+" on "+(removeRequest.slot&&removeRequest.slot.date)+". Reason: "+fullReason,
+                    for_role:"manager",
+                    nav_to:"Approvals",
+                    time:new Date().toISOString(),
+                    read:false,
+                  }).catch(function(e){console.error("Removal notif save failed:",e.message);});
+                }
                 // Add to pendingRemovals list directly - more reliable than slot flags
                 if(setPendingRemovals){
                   setPendingRemovals(function(prev){
@@ -9893,6 +10073,18 @@ export default function App() {
                   });
                 });
                 setJobs(mappedJobs);
+                // Restore timer for any in_progress jobs
+                mappedJobs.forEach(function(j){
+                  if(j.status==="in_progress"&&j.startedAt&&j.propertyId){
+                    var startMs=new Date(j.startedAt).getTime();
+                    if(!isNaN(startMs)){
+                      setJobStartTime(function(prev){var u=Object.assign({},prev);u[j.propertyId]=startMs;return u;});
+                      setJobStarted(function(prev){var u=Object.assign({},prev);u[j.propertyId]=true;return u;});
+                      // Also persist to localStorage so it survives future refreshes
+                      try{localStorage.setItem("turnready_job_start_"+j.propertyId,String(startMs));}catch(e){}
+                    }
+                  }
+                });
               }
             }).catch(function(e){console.error("Cleaner jobs load failed:",e.message);});
           }
@@ -9937,15 +10129,44 @@ export default function App() {
               filter:"cleaner_id=eq."+profile.id,
             },function(payload){
               var j=payload.new;
+              var prevStatus=null;
               setJobs(function(prev){
+                var existing=prev.find(function(job){return job.id===j.id;});
+                prevStatus=existing?existing.status:null;
                 return prev.map(function(job){
                   return job.id!==j.id?job:Object.assign({},job,{
                     status:j.status,
                     scheduledDate:j.scheduled_date||j.date,
                     pay:j.pay||job.pay,
+                    paidAt:j.paid_at||job.paidAt,
+                    completedAt:j.completed_at||job.completedAt,
                   });
                 });
               });
+              // Notify cleaner when job gets approved or paid
+              if((j.status==="approved"||j.status==="paid")&&prevStatus&&prevStatus!=="approved"&&prevStatus!=="paid"){
+                setNotifications(function(prev){
+                  return [{
+                    id:"notif"+Date.now(),type:"paid",icon:"💰",
+                    title:"Job Approved & Paid! 🎉",
+                    body:"Your clean at "+(j.property_name||"the property")+" has been approved. Payment is on its way!",
+                    forRole:"cleaner",navTo:"My Jobs",
+                    time:new Date().toISOString(),read:false,
+                  }].concat(prev).slice(0,50);
+                });
+              }
+              // Notify cleaner when job is rejected (needs_resubmit)
+              if(j.status==="needs_resubmit"&&prevStatus&&prevStatus!=="needs_resubmit"){
+                setNotifications(function(prev){
+                  return [{
+                    id:"notif"+Date.now(),type:"rejected",icon:"❌",
+                    title:"Job Needs Resubmission",
+                    body:"Your clean at "+(j.property_name||"the property")+" was not approved. Tap My Jobs to see the reason and resubmit.",
+                    forRole:"cleaner",navTo:"My Jobs",
+                    time:new Date().toISOString(),read:false,
+                  }].concat(prev).slice(0,50);
+                });
+              }
             })
             .subscribe(function(status){
               console.log("[TurnReady] Cleaner job subscription:",status);
@@ -10380,6 +10601,18 @@ export default function App() {
             }
             if(u.role==="cleaner")setView("Home");
             if(u.role==="manager")setView("Dashboard");
+            // Request push notification permission and subscribe (real users only)
+            if(u.id&&u.id.includes("-")){
+              if("Notification" in window&&Notification.permission==="default"){
+                Notification.requestPermission().then(function(perm){
+                  if(perm==="granted"){
+                    subscribeToPush(u.id).catch(function(e){console.log("[Push] Subscribe failed:",e.message);});
+                  }
+                });
+              } else if("Notification" in window&&Notification.permission==="granted"){
+                subscribeToPush(u.id).catch(function(e){console.log("[Push] Subscribe failed:",e.message);});
+              }
+            }
             // Real managers: always load from Supabase — never from localStorage cache.
             if(u.role==="manager"&&u.id!=="mgr1"){
               setProps([]);setCleaners([]);setJobs([]);setNotifications([]);
@@ -10403,6 +10636,8 @@ export default function App() {
                   avatar:c.avatar||(c.name||"?").split(" ").map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase(),
                   totalEarned:c.total_earned||0,jobsCompleted:c.jobs_completed||0,
                   stripeStatus:c.stripe_status||"pending",joinedAt:c.joined_at||new Date().toISOString(),
+                  reviews:c.reviews||[],
+                  rating:c.rating||5.0,
                 });}));
               }).catch(function(){setCleaners([]);});
               getJobs({}).then(function(dbJobs){
@@ -10414,6 +10649,20 @@ export default function App() {
                   tasks:j.tasks||[],inventory:j.inventory||[],uploads:j.uploads||[],
                 });}));
               }).catch(function(e){console.error("[TurnReady] Login getJobs failed:",e&&e.message);});
+              // Load notifications and subscribe to real-time updates
+              if(u.id&&u.id.includes("-")){
+                getNotifications(u.id).then(function(dbNotifs){
+                  if(dbNotifs&&dbNotifs.length>0){
+                    setNotifications(dbNotifs.map(function(n){return Object.assign({},n,{forRole:n.for_role,navTo:n.nav_to});}));
+                  }
+                }).catch(function(e){console.error("Login notifications load:",e.message);});
+                subscribeToNotifications(u.id,function(newNotif){
+                  setNotifications(function(prev){
+                    var mapped=Object.assign({},newNotif,{forRole:newNotif.for_role,navTo:newNotif.nav_to});
+                    return [mapped].concat(prev).slice(0,50);
+                  });
+                });
+              }
               try{var _rem=localStorage.getItem("turnready_shared_removals");if(_rem){var _rp=JSON.parse(_rem);if(_rp&&_rp.length)setPendingRemovals(_rp);}}catch(e){}
             } else if(u.role==="manager"){
               setProps(INIT_PROPS);setCleaners(INIT_CLEANERS);setJobs(INIT_JOBS);
@@ -10698,6 +10947,74 @@ export default function App() {
     </div></div>
   );
 
+  // Trial expired wall — block manager access until they upgrade
+  if(user.role==="manager"&&user.id&&user.id.includes("-")){
+    var _plan=user.plan||"trial";
+    var _trialStart=user.trial_start||user.trialStart;
+    if(_plan==="trial"&&_trialStart){
+      var _daysUsed=Math.floor((Date.now()-new Date(_trialStart).getTime())/(1000*60*60*24));
+      if(_daysUsed>=7){
+        return(
+          <div><style>{css}</style>
+          <div style={{minHeight:"100vh",background:"#0D0D0D",color:"#FFF",fontFamily:"Inter,sans-serif",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,textAlign:"center"}}>
+            <div style={{fontSize:52,marginBottom:16}}>🔒</div>
+            <div style={{fontFamily:"Arial Black,sans-serif",fontSize:24,fontWeight:900,letterSpacing:1,marginBottom:8}}>
+              <span style={{color:"#FFF"}}>TURN</span><span style={{color:"#CC0000"}}>READY</span>
+            </div>
+            <div style={{fontSize:16,fontWeight:700,color:"#EF4444",marginBottom:8}}>Your Free Trial Has Ended</div>
+            <div style={{fontSize:13,color:"#888",lineHeight:1.7,maxWidth:320,marginBottom:28}}>
+              Your 7-day free trial expired {_daysUsed-7===0?"today":(_daysUsed-7)+" day"+((_daysUsed-7)!==1?"s":"")+  " ago"}. Upgrade to keep managing your properties and team.
+            </div>
+            <div style={{background:"#1A1A1A",border:"1px solid #2A2A2A",borderRadius:14,padding:20,width:"100%",maxWidth:360,marginBottom:20}}>
+              {[["Solo","$29/mo","1 cleaner, unlimited properties"],["Pro","$49/mo","Up to 5 cleaners + full features"],["Agency","$99/mo","Unlimited cleaners + priority support"]].map(function(pl){
+                var isSelected=pl[0].toLowerCase()===(user.plan||"pro");
+                return(
+                  <div key={pl[0]} style={{padding:"12px 14px",borderRadius:10,marginBottom:8,
+                    background:"rgba(204,0,0,.08)",border:"1px solid rgba(204,0,0,.3)"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <div style={{fontFamily:"Arial Black,sans-serif",fontWeight:900,fontSize:13}}>{pl[0].toUpperCase()}</div>
+                        <div style={{fontSize:11,color:"#888",marginTop:2}}>{pl[2]}</div>
+                      </div>
+                      <div style={{fontFamily:"Arial Black,sans-serif",fontSize:15,fontWeight:900,color:"#CC0000"}}>{pl[1]}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button onClick={async function(){
+              var btn=document.activeElement;
+              if(btn){btn.disabled=true;btn.textContent="⏳ LOADING...";}
+              try{
+                var result=await createStripeCheckoutSession({
+                  managerId:user.id,
+                  managerEmail:user.email,
+                  managerName:user.name,
+                  businessName:user.businessName||user.business_name,
+                  plan:user.plan&&user.plan!=="trial"?user.plan:"pro",
+                  stripeCustomerId:user.stripe_customer_id||null,
+                });
+                window.location.href=result.checkoutUrl;
+              }catch(e){
+                if(btn){btn.disabled=false;btn.textContent="UPGRADE NOW — KEEP ACCESS";}
+                alert("Billing error: "+e.message+"\n\nContact support@turnready.app");
+              }
+            }}
+              style={{width:"100%",maxWidth:360,background:"#CC0000",border:"none",borderRadius:10,
+                padding:"16px",color:"#FFF",fontSize:14,fontWeight:900,fontFamily:"Arial Black,sans-serif",
+                letterSpacing:.5,cursor:"pointer",marginBottom:12}}>
+              UPGRADE NOW — KEEP ACCESS
+            </button>
+            <button onClick={function(){signOut().then(function(){setUser(null);}).catch(function(){setUser(null);});}}
+              style={{background:"none",border:"none",color:"#555",fontSize:12,cursor:"pointer"}}>
+              Sign Out
+            </button>
+          </div></div>
+        );
+      }
+    }
+  }
+
 
   function renderView(){
     if(!user)return null;
@@ -10707,8 +11024,9 @@ export default function App() {
           case "Properties": return <Properties props={props} setProps={setProps} jobs={jobs} setJobs={setJobs} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){
               setNotifications(function(prev){return prev.concat([n]);});
               if(user&&user.id&&user.id.includes("-")){
+                var notifUserId=n.forCleaner||n.userId||user.id;
                 createNotification({
-                  user_id:n.forCleaner||n.userId||user.id,
+                  user_id:notifUserId,
                   type:n.type||"info",
                   icon:n.icon||"🔔",
                   title:n.title,
@@ -10717,6 +11035,15 @@ export default function App() {
                   nav_to:n.navTo||null,
                   read:false,
                 }).catch(function(e){console.error("Notif save:",e.message);});
+                // Fire push to cleaner for job assignment
+                if(n.type==="assigned"&&n.forCleaner&&n.forCleaner.includes("-")){
+                  sendPushNotification({
+                    userId:n.forCleaner,
+                    title:n.title||"New Job Assigned!",
+                    body:n.body||"You have a new cleaning job. Open TurnReady to accept.",
+                    url:"/",
+                  }).catch(function(){});
+                }
               }
             }} initialSel={selectedProp} onClearSel={function(){setSelectedProp(null);}}/>;
           case "Team": return <Cleaners cleaners={cleaners} setCleaners={setCleaners} jobs={jobs} pendingCleaners={pendingCleaners} setPendingCleaners={setPendingCleaners} allProps={props} setProps={setProps} user={user} availability={availability} initialSelected={selectedCleaner} onClearSelected={()=>setSelectedCleaner(null)}/>;
@@ -10735,7 +11062,7 @@ export default function App() {
                 }).catch(function(e){console.error("Notif save:",e.message);});
               }
             }}/>;
-          case "Calendar": return <Cal props={props} cleaners={cleaners} setProps={setProps} user={user} setView={setView} onSelectProp={function(id){setSelectedProp(id);setView("Properties");}} availability={availability} setAvailability={setAvailability}/>;
+          case "Calendar": return <Cal props={props} cleaners={cleaners} jobs={jobs} setProps={setProps} user={user} setView={setView} onSelectProp={function(id){setSelectedProp(id);setView("Properties");}} availability={availability} setAvailability={setAvailability}/>;
           case "Payroll": return <Payroll cleaners={cleaners} jobs={jobs}/>;
           case "Approvals": return <Approvals jobs={jobs} setJobs={setJobs} props={props} setProps={setProps} cleaners={cleaners} setCleaners={setCleaners} setView={setView} setNotifications={setNotifications} user={user} setShowMgrStripe={setShowMgrStripe} pendingRemovals={pendingRemovals} setPendingRemovals={setPendingRemovals}/>;
           case "Reports": return <Reports jobs={jobs} props={props} cleaners={cleaners}/>;
@@ -10780,7 +11107,7 @@ export default function App() {
                 }).catch(function(e){console.error("Notif save:",e.message);});
               }
             }}/>;
-          case "Calendar": return <Cal props={props} cleaners={cleaners} setProps={setProps} user={user} setView={setView} myId={user.id} onSelectProp={function(id){setSelectedProp(id);setView("My Jobs");}} availability={availability} setAvailability={setAvailability}/>;
+          case "Calendar": return <Cal props={props} cleaners={cleaners} jobs={jobs} setProps={setProps} user={user} setView={setView} myId={user.id} onSelectProp={function(id){setSelectedProp(id);setView("My Jobs");}} availability={availability} setAvailability={setAvailability}/>;
           case "Reports": return <Reports jobs={jobs} props={props} cleaners={cleaners}/>;
           case "Leaderboard": return <Leaderboard cleaners={cleaners} jobs={jobs} props={props}/>;
           case "My Profile": return <ProfilePage user={user} setUser={setUser} cleaners={cleaners} setCleaners={setCleaners} jobs={jobs} setShowMgrStripe={setShowMgrStripe}/>;
