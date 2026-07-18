@@ -219,18 +219,46 @@ export async function createProperty(property) {
 export async function getPropertyFull(propertyId) {
   const { data, error } = await supabase
     .from('properties')
-    .select('id,tasks_data,rooms_data,inventory_data,cleaner_photos,linen_bag_photos,cleaner_notes')
+    .select('*')
     .eq('id', propertyId)
     .single()
   if (error) throw error
   return {
     id: data.id,
+    name: data.name || '',
+    address: data.address || '',
+    photo: data.photo || null,
+    pay: data.pay || 0,
+    bedrooms: data.bedrooms || 0,
+    bathrooms: data.bathrooms || 0,
+    notes: data.notes || '',
+    check_in: data.check_in || '',
+    check_out: data.check_out || '',
+    checkIn: data.check_in || '',
+    checkOut: data.check_out || '',
+    same_day: data.same_day || false,
+    sameDay: data.same_day || false,
+    access_code: data.access_code || '',
+    accessCode: data.access_code || '',
+    supply_info: data.supply_info || '',
+    supplyInfo: data.supply_info || '',
+    alarm_code: data.alarm_code || '',
+    alarmCode: data.alarm_code || '',
+    linen_rate: data.linen_rate || 0,
+    linenRate: data.linen_rate || 0,
+    total_beds: data.total_beds || 0,
+    totalBeds: data.total_beds || 0,
+    linen_bags: data.linen_bags || 0,
+    linenBags: data.linen_bags || 0,
     tasks: data.tasks_data || [],
     rooms: data.rooms_data || [],
     inventory: data.inventory_data || [],
     cleanerPhotos: data.cleaner_photos || [],
     linenBagPhotos: data.linen_bag_photos || [],
     cleanerNotes: data.cleaner_notes || '',
+    schedule: data.schedule || [],
+    ical_url: data.ical_url || null,
+    icalUrl: data.ical_url || null,
   }
 }
 
@@ -270,6 +298,7 @@ export async function updateProperty(id, updates) {
   if (updates.linenBags !== undefined) dbUpdates.linen_bags = updates.linenBags
   if (updates.assignedTo !== undefined) dbUpdates.assigned_to = updates.assignedTo
   if (updates.guest_rating !== undefined) dbUpdates.guest_rating = updates.guest_rating
+  if (updates.ical_url !== undefined) dbUpdates.ical_url = updates.ical_url
 
   const { data, error } = await supabase
     .from('properties')
@@ -613,4 +642,81 @@ export async function getCleanersByInviteCode(inviteCode) {
     .single()
   if (error) return null
   return data
+}
+
+// ── PUSH NOTIFICATIONS ────────────────────────────────────────────────────────
+
+// Save a Web Push subscription to Supabase for a user
+export async function savePushSubscription(userId, subscription) {
+  const { error } = await supabase
+    .from('users')
+    .update({ push_subscription: subscription })
+    .eq('id', userId)
+  if (error) throw error
+}
+
+// Send a push notification via Vercel API
+export async function sendPushNotification({ userId, title, body, url }) {
+  const response = await fetch('/api/send-push', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, title, body, url }),
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error || 'Push failed')
+  return data
+}
+
+// Subscribe user to Web Push, save to Supabase
+export async function subscribeToPush(userId) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.log('[Push] Not supported in this browser')
+    return null
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const existing = await reg.pushManager.getSubscription()
+    if (existing) {
+      await savePushSubscription(userId, existing.toJSON())
+      return existing
+    }
+    // VAPID public key — must match VAPID_PUBLIC_KEY env var in Vercel
+    const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+    if (!vapidPublicKey) {
+      console.log('[Push] VITE_VAPID_PUBLIC_KEY not set — push skipped')
+      return null
+    }
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    })
+    await savePushSubscription(userId, sub.toJSON())
+    return sub
+  } catch (e) {
+    console.error('[Push] Subscribe failed:', e.message)
+    return null
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i)
+  return outputArray
+}
+
+// ── ICAL SYNC ─────────────────────────────────────────────────────────────────
+
+// Fetch and parse an Airbnb/VRBO iCal feed via Vercel API
+export async function syncICal(icalUrl) {
+  const response = await fetch('/api/ical-sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ icalUrl }),
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error || 'iCal sync failed')
+  return data // { bookings: [{checkIn, checkOut, cleanDate, summary, uid}], count }
 }
