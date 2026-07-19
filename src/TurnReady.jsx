@@ -1405,7 +1405,7 @@ function Stat({label,value,color,sub}){
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function Dashboard({props,cleaners,jobs,setView,notifications,user,onSelectCleaner}){
+function Dashboard({props,cleaners,jobs,setView,notifications,user,onSelectCleaner,onSelectProp}){
   var pend=jobs.filter(j=>j.status==="pending_approval").length;
   var approved=jobs.filter(j=>j.status==="approved");
   var paid=approved.reduce((s,j)=>s+j.pay,0);
@@ -1592,7 +1592,7 @@ function Dashboard({props,cleaners,jobs,setView,notifications,user,onSelectClean
             </div>
             {inProgress.map(function(item){
               return(
-                <div key={item.slot.id} onClick={function(){setView("Properties");}}
+                <div key={item.slot.id} onClick={function(){if(onSelectProp)onSelectProp(item.prop.id);setView("Properties");}}
                   style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid rgba(34,197,94,.1)",cursor:"pointer"}}>
                   <div style={{width:36,height:36,borderRadius:8,overflow:"hidden",flexShrink:0,background:"#1A1A1A",display:"flex",alignItems:"center",justifyContent:"center"}}>
                     {item.prop.photo?<img src={item.prop.photo} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:16,opacity:.4}}>🏠</span>}
@@ -2052,13 +2052,8 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
                     transition:"background .15s,opacity .15s"}}>
                   <div style={{cursor:"grab",color:"#555",fontSize:16,flexShrink:0,
                     userSelect:"none",padding:"0 2px",touchAction:"none"}}>⠿</div>
-                  <div onClick={function(){setProps(function(ps){return ps.map(function(pp){
-                    return pp.id!==prop.id?pp:Object.assign({},pp,{tasks:(pp.tasks||[]).map(function(tk){
-                      return tk.id!==t.id?tk:Object.assign({},tk,{done:!tk.done});
-                    })});
-                  });})}}
-                    style={{width:22,height:22,borderRadius:5,border:"2px solid "+(t.done?"#22C55E":"#444"),background:t.done?"#22C55E":"transparent",
-                    display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
+                  <div style={{width:22,height:22,borderRadius:5,border:"2px solid "+(t.done?"#22C55E":"#444"),background:t.done?"#22C55E":"transparent",
+                    display:"flex",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0}}>
                     {t.done&&<span style={{color:"#FFF",fontSize:12,fontWeight:900}}>✓</span>}
                   </div>
                   <textarea value={t.label}
@@ -2513,7 +2508,7 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
           <div>
           <div className="card" style={{marginBottom:16}}>
             <div style={{fontFamily:"Arial Black,sans-serif",fontSize:13,fontWeight:900,letterSpacing:.5,marginBottom:4}}>GUEST CONDITION RATING</div>
-            <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Submitted by cleaner · tap any rating to edit or override</div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Submitted by cleaner — read only</div>
             {[
               {stars:5,label:"Excellent",emoji:"⭐⭐⭐⭐⭐",desc:"Minimal trash. Light bed use. No heavy mess."},
               {stars:4,label:"Normal Stay",emoji:"⭐⭐⭐⭐",desc:"Trash present. Minor crumbs. Normal use."},
@@ -2523,13 +2518,9 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
             ].map(function(r){
               var selected=prop.guestRating===r.stars;
               return(
-                <div key={r.stars} onClick={function(){
-                  setProps(function(ps){return ps.map(function(p){
-                    return p.id!==prop.id?p:Object.assign({},p,{guestRating:selected?null:r.stars});
-                  });});
-                }} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:"1px solid #222",cursor:"pointer",
+                <div key={r.stars} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:"1px solid #222",cursor:"default",
                   background:selected?"rgba(245,158,11,.08)":"transparent",borderRadius:selected?8:0,
-                  opacity:prop.guestRating&&!selected?0.4:1}}>
+                  opacity:prop.guestRating&&!selected?0.3:1}}>
                   <div style={{width:24,height:24,borderRadius:6,flexShrink:0,marginTop:2,
                     border:"2px solid "+(selected?"#F59E0B":"#444"),
                     background:selected?"#F59E0B":"transparent",
@@ -2548,10 +2539,6 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
               );
             })}
             {!prop.guestRating&&<div style={{fontSize:11,color:C.muted,textAlign:"center",paddingTop:8}}>No rating submitted by cleaner yet</div>}
-            {prop.guestRating&&(
-              <button onClick={function(){setProps(function(ps){return ps.map(function(p){return p.id!==prop.id?p:Object.assign({},p,{guestRating:null});});});}}
-                style={{width:"100%",marginTop:12,background:"transparent",border:"1px solid #555",borderRadius:8,color:"#888",fontSize:11,fontWeight:700,padding:"8px",cursor:"pointer"}}>Clear Rating</button>
-            )}
             <div style={{marginTop:14,borderTop:"1px solid #2A2A2A",paddingTop:14}}>
               <div style={{fontSize:10,color:C.red,fontWeight:700,letterSpacing:.5,marginBottom:8,textTransform:"uppercase"}}>💬 Condition Notes</div>
               <textarea
@@ -2610,6 +2597,15 @@ function PropDetail({prop,cleaner,onBack,onAssign,setProps,cleaners=[],addNotifi
             <div className="card">
               <div style={{fontFamily:"Arial Black,sans-serif",fontSize:12,fontWeight:900,letterSpacing:.5,marginBottom:4,color:"#22C55E"}}>🧹 CLEANER NOTES</div>
               <div style={{fontSize:11,color:C.muted,marginBottom:10}}>Notes and photos submitted by the cleaner</div>
+              {/* Linen bag count */}
+              <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(59,130,246,.08)",border:"1px solid rgba(59,130,246,.2)",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+                <span style={{fontSize:18}}>🛍️</span>
+                <div>
+                  <div style={{fontSize:11,color:"#888",marginBottom:1}}>Linen Bags Collected</div>
+                  <div style={{fontFamily:"Arial Black,sans-serif",fontSize:16,fontWeight:900,color:"#3B82F6"}}>{prop.linenBags||0} bag{(prop.linenBags||0)!==1?"s":""}</div>
+                </div>
+                {(prop.linenBags||0)>0&&<div style={{marginLeft:"auto",fontSize:11,color:"#888"}}>${((prop.linenBags||0)*(prop.linenRate||10)).toFixed(0)} linen charge</div>}
+              </div>
               {(prop.cleanerNotes||"")?(
                 <div style={{background:"#1A1A1A",borderRadius:8,padding:"10px 12px",fontSize:12,color:C.offWhite,lineHeight:1.6,marginBottom:10}}>{prop.cleanerNotes}</div>
               ):(
@@ -5288,10 +5284,24 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
                 setNotifications(function(prev){return [{
                   id:"notif"+Date.now(),type:"info",icon:"ℹ️",
                   title:"Job Assignment Removed",
-                  body:"Harvey has removed you from "+job.propertyName+(job.date?" on "+job.date:"")+". Contact Harvey if you have questions.",
+                  body:"You have been removed from "+job.propertyName+(job.date?" on "+job.date:"")+". Contact your manager if you have questions.",
                   forRole:"cleaner",forCleaner:job.cleanerId,
                   navTo:"My Jobs",time:new Date().toISOString(),read:false
                 }].concat(prev).slice(0,50);});
+                // Save notification to Supabase for cleaner
+                if(job.cleanerId&&job.cleanerId.includes("-")){
+                  createNotification({
+                    user_id:job.cleanerId,type:"info",icon:"ℹ️",
+                    title:"Job Assignment Removed",
+                    body:"You have been removed from "+job.propertyName+(job.date?" on "+job.date:"")+". Contact your manager if you have questions.",
+                    for_role:"cleaner",nav_to:"My Jobs",
+                    time:new Date().toISOString(),read:false,
+                  }).catch(function(){});
+                }
+                // Update job in Supabase
+                if(job.id&&job.id.includes("-")){
+                  updateJob(job.id,{status:"cancelled",cleaner_id:null}).catch(function(){});
+                }
                 setRemoveJobConfirm(null);
               }}
                 style={{flex:2,background:"#EF4444",border:"none",borderRadius:8,padding:"11px",color:"#FFF",fontSize:12,fontWeight:900,fontFamily:"Arial Black,sans-serif",cursor:"pointer",letterSpacing:.3}}>
@@ -5875,6 +5885,11 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
       if(realJobId&&realJobId.includes("-")){
         updateJob(realJobId,{status:"in_progress",started_at:startISO}).catch(function(e){console.error("startJob save failed:",e.message);});
       }
+    }
+    // Notify manager that cleaner started the job
+    if(addNotification){addNotification({type:"job_started",icon:"🧹",title:"Job Started",body:user.name+" has started cleaning "+prop.name,forRole:"manager",navTo:"Properties",time:new Date().toISOString(),read:false});}
+    if(user.manager_id&&user.manager_id.includes("-")){
+      createNotification({user_id:user.manager_id,type:"job_started",icon:"🧹",title:"Job Started",body:user.name+" has started cleaning "+prop.name,for_role:"manager",nav_to:"Properties",time:new Date().toISOString(),read:false}).catch(function(){});
     }
     // Update slot status to in_progress AND clear inventory/task statuses for fresh start
     setProps(function(ps){return ps.map(function(pp){
@@ -6481,55 +6496,79 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                     <div style={{marginBottom:12}}>
                       <div style={{fontSize:10,color:C.red,fontWeight:700,letterSpacing:.5,marginBottom:8,textTransform:"uppercase"}}>📸 Reference — This is how it should look</div>
                       <div style={{display:"flex",gap:8,overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:4}}>
-                        {(room.refPhotos||[]).map(function(ph,i){
-                          return <img key={i} src={ph} alt={"ref "+(i+1)}
-                            onClick={function(){
-                              // Open swipeable gallery overlay
-                              var photos=room.refPhotos||[];
-                              var current={idx:i};
-                              var overlay=document.createElement("div");
-                              overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.97);z-index:9999;display:flex;align-items:center;justify-content:center;touch-action:manipulation;";
-                              function render(){
-                                overlay.innerHTML="";
+                        {(function(){
+                          // Build combined media array: photos + refVideo
+                          var media=(room.refPhotos||[]).map(function(ph){return {type:"photo",src:ph};});
+                          if(room.refVideo)media=media.concat([{type:"video",src:room.refVideo}]);
+                          function openGallery(startIdx){
+                            var current={idx:startIdx};
+                            var touchStartX=0;
+                            var overlay=document.createElement("div");
+                            overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.97);z-index:9999;display:flex;align-items:center;justify-content:center;";
+                            function render(){
+                              overlay.innerHTML="";
+                              var item=media[current.idx];
+                              if(item.type==="video"){
+                                var vid=document.createElement("video");
+                                vid.src=item.src;vid.controls=true;
+                                vid.style.cssText="max-width:92vw;max-height:85vh;border-radius:8px;display:block;";
+                                overlay.appendChild(vid);
+                              } else {
                                 var img=document.createElement("img");
-                                img.src=photos[current.idx];
+                                img.src=item.src;
                                 img.style.cssText="max-width:92vw;max-height:85vh;object-fit:contain;border-radius:8px;display:block;";
                                 overlay.appendChild(img);
-                                // Counter
-                                var counter=document.createElement("div");
-                                counter.textContent=(current.idx+1)+" / "+photos.length;
-                                counter.style.cssText="position:absolute;top:16px;left:50%;transform:translateX(-50%);color:#FFF;font-size:13px;font-weight:700;";
-                                overlay.appendChild(counter);
-                                // Close
-                                var close=document.createElement("button");
-                                close.textContent="✕";
-                                close.style.cssText="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.2);border:none;color:#FFF;font-size:18px;width:34px;height:34px;border-radius:50%;cursor:pointer;";
-                                close.onclick=function(){document.body.removeChild(overlay);};
-                                overlay.appendChild(close);
-                                // Prev arrow
-                                if(photos.length>1&&current.idx>0){
-                                  var prev=document.createElement("button");
-                                  prev.textContent="‹";
-                                  prev.style.cssText="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);border:none;color:#FFF;font-size:36px;width:44px;height:60px;border-radius:8px;cursor:pointer;";
-                                  prev.onclick=function(){current.idx--;render();};
-                                  overlay.appendChild(prev);
-                                }
-                                // Next arrow
-                                if(photos.length>1&&current.idx<photos.length-1){
-                                  var next=document.createElement("button");
-                                  next.textContent="›";
-                                  next.style.cssText="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);border:none;color:#FFF;font-size:36px;width:44px;height:60px;border-radius:8px;cursor:pointer;";
-                                  next.onclick=function(){current.idx++;render();};
-                                  overlay.appendChild(next);
-                                }
                               }
-                              render();
-                              overlay.onclick=function(ev){if(ev.target===overlay)document.body.removeChild(overlay);};
-                              document.body.appendChild(overlay);
-                            }}
-                            style={{width:90,height:90,borderRadius:8,objectFit:"cover",flexShrink:0,cursor:"pointer",border:"1px solid #333"}}/>;
-                        })}
-                        {room.refVideo&&<video src={room.refVideo} controls style={{width:90,height:90,borderRadius:8,objectFit:"cover",flexShrink:0}}/>}
+                              var counter=document.createElement("div");
+                              counter.textContent=(current.idx+1)+" / "+media.length+(item.type==="video"?" 🎬":"");
+                              counter.style.cssText="position:absolute;top:16px;left:50%;transform:translateX(-50%);color:#FFF;font-size:13px;font-weight:700;background:rgba(0,0,0,.5);padding:3px 10px;border-radius:20px;";
+                              overlay.appendChild(counter);
+                              var close=document.createElement("button");
+                              close.textContent="✕";
+                              close.style.cssText="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.2);border:none;color:#FFF;font-size:18px;width:34px;height:34px;border-radius:50%;cursor:pointer;";
+                              close.onclick=function(){document.body.removeChild(overlay);};
+                              overlay.appendChild(close);
+                              if(media.length>1&&current.idx>0){
+                                var prev=document.createElement("button");
+                                prev.textContent="‹";
+                                prev.style.cssText="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);border:none;color:#FFF;font-size:40px;width:48px;height:64px;border-radius:8px;cursor:pointer;";
+                                prev.onclick=function(e){e.stopPropagation();current.idx--;render();};
+                                overlay.appendChild(prev);
+                              }
+                              if(media.length>1&&current.idx<media.length-1){
+                                var next=document.createElement("button");
+                                next.textContent="›";
+                                next.style.cssText="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);border:none;color:#FFF;font-size:40px;width:48px;height:64px;border-radius:8px;cursor:pointer;";
+                                next.onclick=function(e){e.stopPropagation();current.idx++;render();};
+                                overlay.appendChild(next);
+                              }
+                            }
+                            // Touch swipe support
+                            overlay.addEventListener("touchstart",function(e){touchStartX=e.touches[0].clientX;},{passive:true});
+                            overlay.addEventListener("touchend",function(e){
+                              var dx=e.changedTouches[0].clientX-touchStartX;
+                              if(Math.abs(dx)>40){
+                                if(dx<0&&current.idx<media.length-1){current.idx++;render();}
+                                else if(dx>0&&current.idx>0){current.idx--;render();}
+                              }
+                            });
+                            render();
+                            overlay.onclick=function(ev){if(ev.target===overlay)document.body.removeChild(overlay);};
+                            document.body.appendChild(overlay);
+                          }
+                          return media.map(function(item,i){
+                            if(item.type==="video"){
+                              return <div key={i} onClick={function(){openGallery(i);}}
+                                style={{width:90,height:90,borderRadius:8,flexShrink:0,cursor:"pointer",border:"1px solid #333",background:"#000",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                                <video src={item.src} style={{width:"100%",height:"100%",borderRadius:8,objectFit:"cover",pointerEvents:"none"}}/>
+                                <div style={{position:"absolute",fontSize:22}}>▶</div>
+                              </div>;
+                            }
+                            return <img key={i} src={item.src} alt={"ref "+(i+1)}
+                              onClick={function(){openGallery(i);}}
+                              style={{width:90,height:90,borderRadius:8,objectFit:"cover",flexShrink:0,cursor:"pointer",border:"1px solid #333"}}/>;
+                          });
+                        })()}
                       </div>
                     </div>
                   )}
@@ -6881,16 +6920,25 @@ function CleanerJobs({user,props,setProps,jobs,setJobs,cleaners,pendingRemovals,
                   if(!emergencyType)return;
                   var types={damage:"💔 Property Damage",missing:"❓ Missing Items",odor:"💨 Strong Odor",biohazard:"⚠️ Biohazard",pest:"🐛 Pest Issue",party:"🎉 Party/Excessive Mess",other:"📋 Other Issue"};
                   var label=types[emergencyType]||"Issue";
-                  addNotification&&addNotification({
-                    type:"emergency",
-                    icon:"🚨",
-                    title:"EMERGENCY: "+label,
+                  var emergencyNotif={
+                    type:"emergency",icon:"🚨",
+                    title:"🚨 EMERGENCY: "+label,
                     body:user.name+" reported a problem at "+prop.name+(emergencyNote?" — "+emergencyNote.slice(0,60):""),
-                    forRole:"manager",
-                    navTo:"Properties",
-                    time:new Date().toISOString(),
-                    read:false
-                  });
+                    forRole:"manager",navTo:"Properties",
+                    time:new Date().toISOString(),read:false
+                  };
+                  addNotification&&addNotification(emergencyNotif);
+                  // Save to Supabase so manager sees it after refresh
+                  if(user.manager_id&&user.manager_id.includes("-")){
+                    createNotification({
+                      user_id:user.manager_id,
+                      type:"emergency",icon:"🚨",
+                      title:"🚨 EMERGENCY: "+label,
+                      body:user.name+" reported a problem at "+prop.name+(emergencyNote?" — "+emergencyNote.slice(0,60):""),
+                      for_role:"manager",nav_to:"Properties",
+                      time:new Date().toISOString(),read:false,
+                    }).catch(function(e){console.error("Emergency notif failed:",e.message);});
+                  }
                   setEmergencyFiled(function(prev){var u=Object.assign({},prev);u[prop.id]=true;return u;});
                   setShowEmergency(false);
                   setEmergencyNote("");
@@ -7534,33 +7582,47 @@ function Messages({user,cleaners,addNotification}){
         email:user.managerEmail||user.manager_email||""
       }];
 
-  // Load messages from Supabase when contact is selected
+  // Load messages from Supabase when contact is selected + subscribe real-time
   useEffect(function(){
     if(!selCleaner||!user||!user.id||!user.id.includes("-"))return;
-    // For cleaner messaging manager: use manager_id as the other party's ID
     var otherId=isManager?selCleaner.id:(user.manager_id||selCleaner.id);
     if(!otherId||!otherId.includes("-"))return;
-    if(msgsLoaded[otherId])return;
+    var key=isManager?selCleaner.id:user.id;
+    // Always reload from Supabase when switching contacts (no cache gate)
     getMessages(user.id,otherId).then(function(dbMsgs){
-      if(dbMsgs&&dbMsgs.length>0){
-        var mapped=dbMsgs.map(function(m){
-          return {
-            id:m.id,
-            role:m.from_id===user.id?(isManager?"manager":"cleaner"):(isManager?"cleaner":"manager"),
-            text:m.text||"",
-            media:m.media_url?{url:m.media_url,type:m.media_type,name:m.media_name}:null,
-            time:new Date(m.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
-          };
-        });
-        var key=isManager?selCleaner.id:user.id;
-        setMsgs(function(prev){
-          var updated=Object.assign({},prev);
-          updated[key]=mapped;
-          return updated;
-        });
-        setMsgsLoaded(function(prev){return Object.assign({},prev,{[otherId]:true});});
-      }
+      var mapped=(dbMsgs||[]).map(function(m){
+        return {
+          id:m.id,
+          role:m.from_id===user.id?(isManager?"manager":"cleaner"):(isManager?"cleaner":"manager"),
+          text:m.text||"",
+          media:m.media_url?{url:m.media_url,type:m.media_type,name:m.media_name}:null,
+          time:new Date(m.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
+        };
+      });
+      setMsgs(function(prev){var updated=Object.assign({},prev);updated[key]=mapped;return updated;});
+      setMsgsLoaded(function(prev){return Object.assign({},prev,{[otherId]:true});});
     }).catch(function(e){console.error("Messages load failed:",e.message);});
+    // Subscribe to real-time incoming messages
+    var channel=subscribeToMessages(user.id,function(newMsg){
+      if(newMsg.from_id!==otherId)return; // only from current contact
+      var incomingKey=isManager?selCleaner.id:user.id;
+      var mapped={
+        id:newMsg.id,
+        role:isManager?"cleaner":"manager",
+        text:newMsg.text||"",
+        media:newMsg.media_url?{url:newMsg.media_url,type:newMsg.media_type,name:newMsg.media_name}:null,
+        time:new Date(newMsg.created_at||Date.now()).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
+      };
+      setMsgs(function(prev){
+        var updated=Object.assign({},prev);
+        var existing=updated[incomingKey]||[];
+        // Avoid duplicates
+        if(existing.find(function(m){return m.id===mapped.id;}))return prev;
+        updated[incomingKey]=existing.concat([mapped]);
+        return updated;
+      });
+    });
+    return function(){if(channel&&channel.unsubscribe)channel.unsubscribe();};
   },[selCleaner]);
 
   function send(){
@@ -7674,7 +7736,7 @@ function Messages({user,cleaners,addNotification}){
                   {m.isBroadcast&&!isMe&&(
                     <div style={{fontSize:9,color:"#F59E0B",fontWeight:700,marginBottom:3,paddingLeft:4}}>📢 BROADCAST</div>
                   )}
-                  <div style={{background:isMe?"#CC0000":"#1A1A1A",borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px"}}>
+                  <div style={{background:isMe?"#CC0000":"#1A1A1A",borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",wordBreak:"break-word",overflowWrap:"anywhere"}}>
                     <div>
                       {m.media&&m.media.type==="image"&&(
                         <div style={{position:"relative",display:"inline-block",maxWidth:"100%"}}>
@@ -9871,7 +9933,18 @@ function NotificationsPanel({notifications,setNotifications,onClose,user,setView
             return(
               <div key={n.id} onClick={function(){
                   setNotifications(function(ns){return ns.map(function(x){return x.id===n.id?Object.assign({},x,{read:true}):x;});});
-                  if(n.navTo&&setView){setView(n.navTo);setShowNotifs(false);}
+                  if(n.navTo&&setView){
+                    setView(n.navTo);
+                    setShowNotifs(false);
+                    // For message notifications, store the sender so Messages can auto-open that thread
+                    if((n.type==="message"||n.navTo==="Messages")&&n.forCleaner){
+                      try{localStorage.setItem("turnready_open_msg",n.forCleaner);}catch(e){}
+                    }
+                    // For emergency/problem reports, navigate to properties
+                    if(n.type==="emergency"&&n.propId){
+                      try{localStorage.setItem("turnready_open_prop",n.propId);}catch(e){}
+                    }
+                  }
                 }}
                 style={{padding:"14px 16px",borderBottom:"1px solid #1A1A1A",background:n.read?"transparent":"rgba(204,0,0,.04)",cursor:"pointer"}}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
@@ -11020,7 +11093,7 @@ export default function App() {
     if(!user)return null;
     if(user.role==="manager"){
         switch(view){
-          case "Dashboard": return <Dashboard props={props} cleaners={cleaners} jobs={jobs} setView={setView} notifications={notifications} user={user} onSelectCleaner={(c)=>{setSelectedCleaner(c);setView("Team");}}/>;
+          case "Dashboard": return <Dashboard props={props} cleaners={cleaners} jobs={jobs} setView={setView} notifications={notifications} user={user} onSelectCleaner={(c)=>{setSelectedCleaner(c);setView("Team");}} onSelectProp={function(id){setSelectedProp(id);}}/>;
           case "Properties": return <Properties props={props} setProps={setProps} jobs={jobs} setJobs={setJobs} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){
               setNotifications(function(prev){return prev.concat([n]);});
               if(user&&user.id&&user.id.includes("-")){
