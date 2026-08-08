@@ -9988,25 +9988,37 @@ function ToastNotification({toast,onTap,onClose}){
   if(!toast)return null;
   return(
     <div onClick={function(){onTap&&onTap(toast);onClose&&onClose();}}
-      style={{position:"fixed",top:70,left:"50%",transform:"translateX(-50%)",
-        zIndex:9999,width:"calc(100% - 32px)",maxWidth:420,
-        background:"#1A1A1A",border:"1px solid #2A2A2A",
-        borderRadius:14,padding:"12px 14px",
-        display:"flex",alignItems:"flex-start",gap:12,
-        boxShadow:"0 8px 32px rgba(0,0,0,.6)",cursor:"pointer",
-        animation:"slideDown .25s ease"}}>
-      <div style={{width:38,height:38,borderRadius:10,background:"#222",
+      style={{
+        position:"fixed",
+        top:"env(safe-area-inset-top, 0px)",
+        marginTop:58,
+        left:16,
+        right:16,
+        zIndex:99999,
+        background:"#1A1A1A",
+        border:"1px solid #CC0000",
+        borderRadius:14,
+        padding:"14px 14px",
+        display:"flex",
+        alignItems:"center",
+        gap:12,
+        boxShadow:"0 8px 40px rgba(0,0,0,.9), 0 0 0 1px rgba(204,0,0,.3)",
+        cursor:"pointer",
+      }}>
+      <div style={{width:40,height:40,borderRadius:10,background:"rgba(204,0,0,.15)",
         display:"flex",alignItems:"center",justifyContent:"center",
-        fontSize:18,flexShrink:0}}>{toast.icon||"🔔"}</div>
+        fontSize:20,flexShrink:0}}>{toast.icon||"🔔"}</div>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#FFF",marginBottom:2,
+        <div style={{fontSize:14,fontWeight:700,color:"#FFF",marginBottom:3,
           overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{toast.title}</div>
-        {toast.body&&<div style={{fontSize:12,color:"#888",lineHeight:1.4,
+        {toast.body&&<div style={{fontSize:12,color:"#AAA",lineHeight:1.4,
           overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{toast.body}</div>}
+        <div style={{fontSize:10,color:"#CC0000",fontWeight:700,marginTop:3}}>TAP TO OPEN →</div>
       </div>
       <button onClick={function(e){e.stopPropagation();onClose&&onClose();}}
-        style={{background:"none",border:"none",color:"#555",fontSize:18,
-          cursor:"pointer",flexShrink:0,padding:"0 2px",lineHeight:1}}>×</button>
+        style={{background:"rgba(255,255,255,.08)",border:"none",color:"#FFF",fontSize:16,
+          cursor:"pointer",flexShrink:0,width:28,height:28,borderRadius:"50%",
+          display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
     </div>
   );
 }
@@ -11141,45 +11153,41 @@ export default function App() {
 
   function renderView(){
     if(!user)return null;
+
+    // Central notification helper — updates bell AND shows toast
+    function fireNotif(n){
+      setNotifications(function(prev){return [Object.assign({},n,{id:n.id||"n"+Date.now(),read:false})].concat(prev).slice(0,50);});
+      // Show toast popup
+      if(toastTimer.current)clearTimeout(toastTimer.current);
+      setToast({icon:n.icon||"🔔",title:n.title,body:n.body||"",dest:n.navTo||null,forCleaner:n.forCleaner||null,type:n.type||null});
+      toastTimer.current=setTimeout(function(){setToast(null);},5000);
+      // Save to Supabase for the recipient
+      if(user&&user.id&&user.id.includes("-")){
+        var recipientId=n.forCleaner||n.userId||user.id;
+        createNotification({
+          user_id:recipientId,
+          type:n.type||"info",
+          icon:n.icon||"🔔",
+          title:n.title,
+          body:n.body||null,
+          for_role:n.forRole||null,
+          nav_to:n.navTo||null,
+          for_cleaner:n.forCleaner||null,
+          read:false,
+        }).catch(function(e){console.error("Notif save:",e.message);});
+        // Fire push for job assignments
+        if(n.type==="assigned"&&n.forCleaner&&n.forCleaner.includes("-")){
+          sendPushNotification({userId:n.forCleaner,title:n.title||"New Job Assigned!",body:n.body||"You have a new cleaning job.",url:"/"}).catch(function(){});
+        }
+      }
+    }
+
     if(user.role==="manager"){
         switch(view){
           case "Dashboard": return <Dashboard props={props} cleaners={cleaners} jobs={jobs} setView={setView} notifications={notifications} user={user} onSelectCleaner={(c)=>{setSelectedCleaner(c);setView("Team");}} onSelectProp={function(id){setSelectedProp(id);}}/>;
-          case "Properties": return <Properties props={props} setProps={setProps} jobs={jobs} setJobs={setJobs} cleaners={cleaners} user={user} availability={availability} addNotification={function(n){
-              setNotifications(function(prev){return prev.concat([n]);});
-              if(user&&user.id&&user.id.includes("-")){
-                var notifUserId=n.forCleaner||n.userId||user.id;
-                createNotification({
-                  user_id:notifUserId,
-                  type:n.type||"info",
-                  icon:n.icon||"🔔",
-                  title:n.title,
-                  body:n.body||null,
-                  for_role:n.forRole||null,
-                  nav_to:n.navTo||null,
-                  for_cleaner:n.forCleaner||null,
-                  read:false,
-                }).catch(function(e){console.error("Notif save:",e.message);});
-                if(n.type==="assigned"&&n.forCleaner&&n.forCleaner.includes("-")){
-                  sendPushNotification({userId:n.forCleaner,title:n.title||"New Job Assigned!",body:n.body||"You have a new cleaning job.",url:"/"}).catch(function(){});
-                }
-              }
-            }} initialSel={selectedProp} onClearSel={function(){setSelectedProp(null);}}/>;
+          case "Properties": return <Properties props={props} setProps={setProps} jobs={jobs} setJobs={setJobs} cleaners={cleaners} user={user} availability={availability} addNotification={fireNotif} initialSel={selectedProp} onClearSel={function(){setSelectedProp(null);}}/>;
           case "Team": return <Cleaners cleaners={cleaners} setCleaners={setCleaners} jobs={jobs} pendingCleaners={pendingCleaners} setPendingCleaners={setPendingCleaners} allProps={props} setProps={setProps} user={user} availability={availability} initialSelected={selectedCleaner} onClearSelected={()=>setSelectedCleaner(null)}/>;
-          case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={function(n){
-              setNotifications(function(prev){return prev.concat([n]);});
-              if(user&&user.id&&user.id.includes("-")){
-                createNotification({
-                  user_id:n.forCleaner||n.userId||user.id,
-                  type:n.type||"info",
-                  icon:n.icon||"🔔",
-                  title:n.title,
-                  body:n.body||null,
-                  for_role:n.forRole||null,
-                  nav_to:n.navTo||null,
-                  read:false,
-                }).catch(function(e){console.error("Notif save:",e.message);});
-              }
-            }}/>;
+          case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={fireNotif}/>;
           case "Calendar": return <Cal props={props} cleaners={cleaners} jobs={jobs} setProps={setProps} user={user} setView={setView} onSelectProp={function(id){setSelectedProp(id);setView("Properties");}} availability={availability} setAvailability={setAvailability}/>;
           case "Payroll": return <Payroll cleaners={cleaners} jobs={jobs}/>;
           case "Approvals": return <Approvals jobs={jobs} setJobs={setJobs} props={props} setProps={setProps} cleaners={cleaners} setCleaners={setCleaners} setView={setView} setNotifications={setNotifications} user={user} setShowMgrStripe={setShowMgrStripe} pendingRemovals={pendingRemovals} setPendingRemovals={setPendingRemovals}/>;
@@ -11192,39 +11200,11 @@ export default function App() {
       } else {
         switch(view){
           case "Home": return <CleanerDashboard user={user} cleaners={cleaners} jobs={jobs} props={props} setView={setView}/>;
-          case "My Jobs": return <CleanerJobs user={user} props={props} setProps={setProps} jobs={jobs} setJobs={setJobs} cleaners={cleaners} pendingRemovals={pendingRemovals} setPendingRemovals={setPendingRemovals} addNotification={function(n){
-              setNotifications(function(prev){return prev.concat([n]);});
-              if(user&&user.id&&user.id.includes("-")){
-                createNotification({
-                  user_id:n.forCleaner||n.userId||user.id,
-                  type:n.type||"info",
-                  icon:n.icon||"🔔",
-                  title:n.title,
-                  body:n.body||null,
-                  for_role:n.forRole||null,
-                  nav_to:n.navTo||null,
-                  read:false,
-                }).catch(function(e){console.error("Notif save:",e.message);});
-              }
-            }}/>;
+          case "My Jobs": return <CleanerJobs user={user} props={props} setProps={setProps} jobs={jobs} setJobs={setJobs} cleaners={cleaners} pendingRemovals={pendingRemovals} setPendingRemovals={setPendingRemovals} addNotification={fireNotif}/>;
           case "My Earnings": return <CleanerEarnings user={user} cleaners={cleaners} jobs={jobs}/>;
           case "My Ratings": return <CleanerRatings user={user} cleaners={cleaners} jobs={jobs} props={props} setView={setView}/>;
           case "My Availability": return <CleanerAvailability user={user} availability={availability} setAvailability={setAvailability}/>;
-          case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={function(n){
-              setNotifications(function(prev){return prev.concat([n]);});
-              if(user&&user.id&&user.id.includes("-")){
-                createNotification({
-                  user_id:n.forCleaner||n.userId||user.id,
-                  type:n.type||"info",
-                  icon:n.icon||"🔔",
-                  title:n.title,
-                  body:n.body||null,
-                  for_role:n.forRole||null,
-                  nav_to:n.navTo||null,
-                  read:false,
-                }).catch(function(e){console.error("Notif save:",e.message);});
-              }
-            }}/>;
+          case "Messages": return <Messages user={user} cleaners={cleaners} addNotification={fireNotif}/>;
           case "Calendar": return <Cal props={props} cleaners={cleaners} jobs={jobs} setProps={setProps} user={user} setView={setView} myId={user.id} onSelectProp={function(id){setSelectedProp(id);setView("My Jobs");}} availability={availability} setAvailability={setAvailability}/>;
           case "Reports": return <Reports jobs={jobs} props={props} cleaners={cleaners}/>;
           case "Leaderboard": return <Leaderboard cleaners={cleaners} jobs={jobs} props={props}/>;
