@@ -10753,20 +10753,57 @@ export default function App() {
             if(u.id&&u.id.includes("-")){
               // Wait for service worker to be fully ready before subscribing
               function trySubscribePush(userId){
-                if(!("serviceWorker" in navigator)||!("PushManager" in window)){return;}
-                navigator.serviceWorker.ready.then(function(){
-                  if("Notification" in window&&Notification.permission==="default"){
-                    Notification.requestPermission().then(function(perm){
-                      if(perm==="granted"){
-                        subscribeToPush(userId).catch(function(e){console.log("[Push] Subscribe failed:",e.message);});
+                if(!("serviceWorker" in navigator)||!("PushManager" in window)){
+                  alert("[Push Debug] ServiceWorker or PushManager not available");
+                  return;
+                }
+                navigator.serviceWorker.ready.then(function(reg){
+                  var vapidKey=import.meta.env.VITE_VAPID_PUBLIC_KEY;
+                  if(!vapidKey){
+                    alert("[Push Debug] VAPID key is missing! Check Vercel env vars.");
+                    return;
+                  }
+                  var perm=("Notification" in window)?Notification.permission:"unknown";
+                  if(perm==="denied"){
+                    alert("[Push Debug] Notifications are DENIED. Go to phone Settings → Apps → Chrome → Notifications and enable.");
+                    return;
+                  }
+                  if(perm==="default"){
+                    Notification.requestPermission().then(function(p){
+                      if(p==="granted"){
+                        doSubscribe(reg,vapidKey,userId);
+                      } else {
+                        alert("[Push Debug] Permission denied by user");
                       }
                     });
-                  } else if("Notification" in window&&Notification.permission==="granted"){
-                    subscribeToPush(userId).catch(function(e){console.log("[Push] Subscribe failed:",e.message);});
+                  } else {
+                    doSubscribe(reg,vapidKey,userId);
                   }
-                }).catch(function(e){console.log("[Push] SW not ready:",e.message);});
+                }).catch(function(e){alert("[Push Debug] SW not ready: "+e.message);});
               }
-              // Small delay to ensure SW is registered
+              function doSubscribe(reg,vapidKey,userId){
+                reg.pushManager.getSubscription().then(function(existing){
+                  if(existing){
+                    alert("[Push Debug] Existing subscription found — saving to DB");
+                    subscribeToPush(userId).then(function(){
+                      alert("[Push Debug] ✅ Saved existing subscription to Supabase!");
+                    }).catch(function(e){alert("[Push Debug] Save failed: "+e.message);});
+                    return;
+                  }
+                  // Try new subscription
+                  var padding='='.repeat((4-vapidKey.length%4)%4);
+                  var base64=(vapidKey+padding).replace(/-/g,'+').replace(/_/g,'/');
+                  var raw=window.atob(base64);
+                  var key=new Uint8Array(raw.length);
+                  for(var i=0;i<raw.length;i++)key[i]=raw.charCodeAt(i);
+                  reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key}).then(function(sub){
+                    alert("[Push Debug] ✅ New subscription created! Saving...");
+                    subscribeToPush(userId).then(function(){
+                      alert("[Push Debug] ✅ Saved to Supabase! Push should work now.");
+                    }).catch(function(e){alert("[Push Debug] DB save failed: "+e.message);});
+                  }).catch(function(e){alert("[Push Debug] Subscribe failed: "+e.message);});
+                });
+              }
               setTimeout(function(){trySubscribePush(u.id);}, 2000);
             }
             // Real managers: always load from Supabase — never from localStorage cache.
