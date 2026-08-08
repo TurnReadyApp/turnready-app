@@ -1,22 +1,799 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#0D0D0D" />
-    <title>TurnReady</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-    <style>
-      html, body, #root { height: 100%; }
-      body { margin: 0; background: #0D0D0D; }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TurnReady — 5-Star Turnovers, Every Time</title>
+<meta name="description" content="The professional cleaning management app for Airbnb hosts and cleaning teams. Assign jobs, track quality, manage payments — all in one place."/>
+<!-- PWA Manifest -->
+<link rel="manifest" href="/manifest.json"/>
+<meta name="theme-color" content="#CC0000"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="TurnReady"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script>
+  // Register service worker for PWA + push notifications
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(function(reg){console.log('[SW] Registered:', reg.scope);})
+        .catch(function(err){console.log('[SW] Registration failed:', err);});
+    });
+  }
+</script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #CC0000;
+    --red-dark: #A80000;
+    --red-glow: rgba(204,0,0,.18);
+    --black: #0D0D0D;
+    --card: #141414;
+    --border: #222222;
+    --muted: #555555;
+    --gray: #888888;
+    --offwhite: #E8E8E8;
+    --white: #FFFFFF;
+    --green: #22C55E;
+    --amber: #F59E0B;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--black);
+    color: var(--offwhite);
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px; height: 64px;
+    background: rgba(13,13,13,.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    display: flex; align-items: center; gap: 10px;
+    text-decoration: none;
+  }
+
+  .nav-logo-mark {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Arial Black', sans-serif;
+    font-weight: 900; font-size: 14px; color: #fff;
+    letter-spacing: -1px;
+  }
+
+  .nav-logo-text {
+    font-family: 'Arial Black', sans-serif;
+    font-weight: 900; font-size: 16px; color: var(--white);
+    letter-spacing: .5px;
+  }
+
+  .nav-links { display: flex; align-items: center; gap: 28px; }
+  .nav-links a {
+    color: var(--gray); text-decoration: none; font-size: 14px;
+    font-weight: 500; transition: color .2s;
+  }
+  .nav-links a:hover { color: var(--white); }
+
+  .btn-nav {
+    background: var(--red); color: #fff; border: none;
+    padding: 8px 20px; border-radius: 8px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    text-decoration: none; transition: background .2s;
+    font-family: 'Arial Black', sans-serif; letter-spacing: .3px;
+  }
+  .btn-nav:hover { background: var(--red-dark); }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    padding: 120px 24px 80px;
+    position: relative; overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+    width: 700px; height: 700px;
+    background: radial-gradient(circle, rgba(204,0,0,.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--red-glow); border: 1px solid rgba(204,0,0,.3);
+    border-radius: 100px; padding: 6px 16px;
+    font-size: 12px; font-weight: 700; color: var(--red);
+    letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+
+  .hero-eyebrow span { width: 6px; height: 6px; border-radius: 50%; background: var(--red); display: inline-block; }
+
+  .hero h1 {
+    font-family: 'Arial Black', sans-serif;
+    font-weight: 900;
+    font-size: clamp(42px, 8vw, 80px);
+    line-height: 1.05;
+    letter-spacing: -2px;
+    color: var(--white);
+    max-width: 900px;
+    margin-bottom: 12px;
+  }
+
+  .hero h1 em {
+    color: var(--red);
+    font-style: normal;
+  }
+
+  .hero-sub {
+    font-size: clamp(16px, 2.5vw, 20px);
+    color: var(--gray);
+    max-width: 560px;
+    margin: 0 auto 48px;
+    font-weight: 400;
+    line-height: 1.7;
+  }
+
+  .hero-cta {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    align-items: center; justify-content: center;
+    margin-bottom: 72px;
+  }
+
+  .btn-primary {
+    background: var(--red); color: #fff;
+    padding: 14px 32px; border-radius: 10px;
+    font-size: 15px; font-weight: 700;
+    text-decoration: none; display: inline-block;
+    font-family: 'Arial Black', sans-serif;
+    letter-spacing: .3px;
+    transition: background .2s, transform .15s;
+    border: none; cursor: pointer;
+  }
+  .btn-primary:hover { background: var(--red-dark); transform: translateY(-1px); }
+
+  .btn-ghost {
+    background: transparent; color: var(--offwhite);
+    padding: 14px 32px; border-radius: 10px;
+    font-size: 15px; font-weight: 600;
+    text-decoration: none; display: inline-block;
+    border: 1px solid var(--border);
+    transition: border-color .2s, color .2s;
+  }
+  .btn-ghost:hover { border-color: var(--gray); color: var(--white); }
+
+  /* Phone mockup */
+  .hero-visual {
+    position: relative;
+    width: 100%; max-width: 380px; margin: 0 auto;
+  }
+
+  .phone {
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 36px;
+    padding: 16px;
+    box-shadow: 0 40px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04);
+    position: relative;
+  }
+
+  .phone-notch {
+    width: 100px; height: 28px;
+    background: var(--black);
+    border-radius: 0 0 18px 18px;
+    margin: 0 auto 12px;
+  }
+
+  .phone-screen {
+    background: var(--black);
+    border-radius: 24px;
+    overflow: hidden;
+    min-height: 420px;
+  }
+
+  /* App UI mockup inside phone */
+  .app-topbar {
+    background: var(--card);
+    padding: 12px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app-logo { font-family: 'Arial Black', sans-serif; font-size: 12px; font-weight: 900; color: var(--red); letter-spacing: 1px; }
+  .app-bell { width: 28px; height: 28px; background: var(--red); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+
+  .app-content { padding: 14px; }
+
+  .app-greeting { font-size: 11px; color: var(--gray); margin-bottom: 2px; }
+  .app-name { font-family: 'Arial Black', sans-serif; font-size: 15px; font-weight: 900; color: var(--white); margin-bottom: 14px; }
+
+  .app-banner {
+    background: rgba(204,0,0,.12);
+    border: 1px solid rgba(204,0,0,.3);
+    border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
+    font-size: 11px; color: var(--red); font-weight: 700;
+  }
+
+  .app-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+
+  .app-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px;
+  }
+
+  .app-card-label { font-size: 9px; color: var(--gray); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+  .app-card-value { font-family: 'Arial Black', sans-serif; font-size: 18px; font-weight: 900; color: var(--white); }
+  .app-card-value.green { color: var(--green); }
+  .app-card-value.red { color: var(--red); }
+
+  .app-job {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .app-job-name { font-size: 11px; font-weight: 700; color: var(--white); }
+  .app-job-date { font-size: 9px; color: var(--gray); margin-top: 2px; }
+  .app-job-badge {
+    font-size: 9px; font-weight: 700; padding: 3px 7px; border-radius: 6px;
+    background: rgba(34,197,94,.15); color: var(--green); white-space: nowrap;
+  }
+
+  /* ── SOCIAL PROOF ── */
+  .social-proof {
+    padding: 32px 24px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    gap: 48px; flex-wrap: wrap;
+  }
+
+  .proof-item { text-align: center; }
+  .proof-num {
+    font-family: 'Arial Black', sans-serif;
+    font-size: 28px; font-weight: 900; color: var(--white);
+    display: block; line-height: 1;
+    margin-bottom: 4px;
+  }
+  .proof-label { font-size: 12px; color: var(--gray); }
+
+  /* ── SECTIONS ── */
+  section { padding: 96px 24px; max-width: 1100px; margin: 0 auto; }
+
+  .section-eyebrow {
+    font-size: 11px; font-weight: 700; color: var(--red);
+    letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px;
+  }
+
+  .section-title {
+    font-family: 'Arial Black', sans-serif;
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 900; color: var(--white);
+    line-height: 1.1; letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+
+  .section-sub {
+    font-size: 17px; color: var(--gray);
+    max-width: 540px; line-height: 1.7;
+  }
+
+  /* ── FOR HOSTS / FOR CLEANERS ── */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+
+  .split-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+  }
+
+  .split-card-icon { font-size: 32px; margin-bottom: 16px; }
+  .split-card-title {
+    font-family: 'Arial Black', sans-serif;
+    font-size: 20px; font-weight: 900; color: var(--white);
+    margin-bottom: 8px; letter-spacing: .3px;
+  }
+  .split-card-sub { font-size: 14px; color: var(--gray); margin-bottom: 24px; line-height: 1.6; }
+
+  .feature-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .feature-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 14px; color: var(--offwhite); line-height: 1.5;
+  }
+  .feature-list li::before {
+    content: '✓';
+    color: var(--red); font-weight: 900; font-size: 13px;
+    flex-shrink: 0; margin-top: 1px;
+  }
+
+  /* ── FEATURES GRID ── */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 56px;
+  }
+
+  .feat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    transition: border-color .2s;
+  }
+  .feat-card:hover { border-color: rgba(204,0,0,.4); }
+
+  .feat-icon { font-size: 28px; margin-bottom: 14px; }
+  .feat-title { font-weight: 700; font-size: 15px; color: var(--white); margin-bottom: 6px; }
+  .feat-desc { font-size: 13px; color: var(--gray); line-height: 1.6; }
+
+  /* ── HOW IT WORKS ── */
+  .steps { display: flex; flex-direction: column; gap: 0; margin-top: 56px; max-width: 640px; }
+
+  .step {
+    display: flex; gap: 24px; padding-bottom: 40px;
+    position: relative;
+  }
+  .step:not(:last-child)::after {
+    content: '';
+    position: absolute; left: 19px; top: 44px;
+    width: 2px; bottom: 0;
+    background: var(--border);
+  }
+
+  .step-num {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--red); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Arial Black', sans-serif;
+    font-size: 14px; font-weight: 900; color: #fff;
+    position: relative; z-index: 1;
+  }
+
+  .step-body {}
+  .step-title { font-weight: 700; font-size: 16px; color: var(--white); margin-bottom: 4px; }
+  .step-desc { font-size: 14px; color: var(--gray); line-height: 1.6; }
+
+  /* ── PRICING ── */
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-top: 56px;
+  }
+
+  .price-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    position: relative;
+  }
+
+  .price-card.featured {
+    border-color: var(--red);
+    background: linear-gradient(135deg, #1A0000 0%, var(--card) 100%);
+  }
+
+  .price-badge {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    background: var(--red); color: #fff;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    padding: 3px 12px; border-radius: 100px;
+    text-transform: uppercase; white-space: nowrap;
+  }
+
+  .price-plan { font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin-bottom: 12px; }
+  .price-amount {
+    font-family: 'Arial Black', sans-serif;
+    font-size: 40px; font-weight: 900; color: var(--white);
+    line-height: 1; margin-bottom: 4px;
+  }
+  .price-amount span { font-size: 18px; vertical-align: top; margin-top: 6px; display: inline-block; }
+  .price-per { font-size: 12px; color: var(--gray); margin-bottom: 24px; }
+
+  .price-features { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+  .price-features li {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--offwhite);
+  }
+  .price-features li::before { content: '✓'; color: var(--green); font-weight: 700; font-size: 12px; }
+
+  .btn-plan {
+    width: 100%; padding: 12px;
+    border-radius: 8px; font-size: 13px; font-weight: 700;
+    cursor: pointer; text-align: center;
+    font-family: 'Arial Black', sans-serif; letter-spacing: .3px;
+    text-decoration: none; display: block;
+    transition: background .2s;
+  }
+  .btn-plan.outline {
+    background: transparent; color: var(--offwhite);
+    border: 1px solid var(--border);
+  }
+  .btn-plan.outline:hover { border-color: var(--red); color: var(--red); }
+  .btn-plan.solid {
+    background: var(--red); color: #fff; border: none;
+  }
+  .btn-plan.solid:hover { background: var(--red-dark); }
+
+  .price-trial { text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted); }
+
+  /* ── CTA SECTION ── */
+  .cta-section {
+    text-align: center;
+    padding: 96px 24px;
+    position: relative; overflow: hidden;
+  }
+
+  .cta-section::before {
+    content: '';
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 600px; height: 400px;
+    background: radial-gradient(ellipse, rgba(204,0,0,.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .cta-section h2 {
+    font-family: 'Arial Black', sans-serif;
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 900; color: var(--white);
+    line-height: 1.1; letter-spacing: -1.5px;
+    margin-bottom: 16px; max-width: 700px; margin: 0 auto 16px;
+  }
+
+  .cta-section p { font-size: 17px; color: var(--gray); margin-bottom: 40px; }
+
+  .stars { font-size: 22px; color: var(--red); letter-spacing: 4px; margin-bottom: 32px; display: block; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+  }
+
+  .footer-logo {
+    font-family: 'Arial Black', sans-serif;
+    font-size: 16px; font-weight: 900; color: var(--white); letter-spacing: .5px;
+  }
+  .footer-logo span { color: var(--red); }
+
+  .footer-links { display: flex; gap: 24px; }
+  .footer-links a { font-size: 13px; color: var(--gray); text-decoration: none; }
+  .footer-links a:hover { color: var(--white); }
+
+  .footer-copy { font-size: 12px; color: var(--muted); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    nav { padding: 0 16px; }
+    .nav-links { display: none; }
+    .split { grid-template-columns: 1fr; }
+    .features-grid { grid-template-columns: 1fr 1fr; }
+    .pricing-grid { grid-template-columns: 1fr; }
+    .social-proof { gap: 28px; }
+    footer { flex-direction: column; text-align: center; }
+    .footer-links { justify-content: center; }
+  }
+
+  @media (max-width: 480px) {
+    .features-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .hero-eyebrow, .hero h1, .hero-sub, .hero-cta, .hero-visual {
+    animation: fadeUp .7s ease both;
+  }
+  .hero h1        { animation-delay: .1s; }
+  .hero-sub       { animation-delay: .2s; }
+  .hero-cta       { animation-delay: .3s; }
+  .hero-visual    { animation-delay: .4s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-mark">TR</div>
+    <span class="nav-logo-text">TurnReady</span>
+  </a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="mailto:support@turnready.app">Contact</a>
+    <a href="#" class="btn-nav">Get Early Access</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-eyebrow"><span></span> Coming Soon · turnready.app</div>
+  <h1>5-Star Turnovers<br/><em>Don't Happen by Accident.</em></h1>
+  <p class="hero-sub">TurnReady is the professional cleaning management app built for Airbnb hosts and cleaning teams. Assign jobs, track quality, and manage payments — all in one place.</p>
+  <div class="hero-cta">
+    <a href="mailto:hello@turnready.app?subject=Early Access Request" class="btn-primary">Get Early Access</a>
+    <a href="#how-it-works" class="btn-ghost">See How It Works</a>
+  </div>
+
+  <!-- Phone mockup -->
+  <div class="hero-visual">
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="app-topbar">
+          <span class="app-logo">TURNREADY</span>
+          <div class="app-bell">🔔</div>
+        </div>
+        <div class="app-content">
+          <div class="app-greeting">Good morning,</div>
+          <div class="app-name">Harvey 👋</div>
+          <div class="app-banner">📋 New job submitted — Oceanview Villa</div>
+          <div class="app-cards">
+            <div class="app-card">
+              <div class="app-card-label">Revenue</div>
+              <div class="app-card-value green">$4,280</div>
+            </div>
+            <div class="app-card">
+              <div class="app-card-label">Jobs Done</div>
+              <div class="app-card-value red">24</div>
+            </div>
+          </div>
+          <div class="app-job">
+            <div>
+              <div class="app-job-name">Downtown Loft</div>
+              <div class="app-job-date">Today · Maria G.</div>
+            </div>
+            <span class="app-job-badge">✓ Approved</span>
+          </div>
+          <div class="app-job">
+            <div>
+              <div class="app-job-name">Oceanview Villa</div>
+              <div class="app-job-date">Today · James T.</div>
+            </div>
+            <span class="app-job-badge" style="background:rgba(245,158,11,.15);color:#F59E0B;">⏳ Pending</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOCIAL PROOF -->
+<div class="social-proof">
+  <div class="proof-item">
+    <span class="proof-num">5★</span>
+    <span class="proof-label">Guest Ratings</span>
+  </div>
+  <div class="proof-item">
+    <span class="proof-num">8hr</span>
+    <span class="proof-label">Auto-assign Window</span>
+  </div>
+  <div class="proof-item">
+    <span class="proof-num">100%</span>
+    <span class="proof-label">Documented Turnovers</span>
+  </div>
+  <div class="proof-item">
+    <span class="proof-num">$0</span>
+    <span class="proof-label">Setup Fee</span>
+  </div>
+</div>
+
+<!-- FOR HOSTS / FOR CLEANERS -->
+<section id="features">
+  <div class="section-eyebrow">Built for Both Sides</div>
+  <h2 class="section-title">One Platform.<br/>Two Powerful Experiences.</h2>
+  <p class="section-sub">Whether you're managing properties or cleaning them — TurnReady was built with your workflow in mind.</p>
+
+  <div class="split" style="margin-top:56px;">
+    <div class="split-card">
+      <div class="split-card-icon">🏠</div>
+      <div class="split-card-title">For Airbnb Hosts &amp; Managers</div>
+      <div class="split-card-sub">Run your cleaning operation without the chaos. Assign, track, approve, and pay — all from your phone.</div>
+      <ul class="feature-list">
+        <li>Assign jobs in seconds with auto-notifications</li>
+        <li>8-hour acceptance window with auto backup assignment</li>
+        <li>Review task checklists, room videos &amp; inventory before approving</li>
+        <li>Reject with specific reasons — cleaner fixes and resubmits</li>
+        <li>Stripe-powered payments release on approval</li>
+        <li>Leaderboard, earnings reports &amp; performance tracking</li>
+        <li>Property access codes &amp; alarm codes stored securely</li>
+      </ul>
+    </div>
+    <div class="split-card">
+      <div class="split-card-icon">🧹</div>
+      <div class="split-card-title">For Cleaning Professionals</div>
+      <div class="split-card-sub">Everything you need to deliver 5-star turnovers — and get paid fast.</div>
+      <ul class="feature-list">
+        <li>Accept or decline jobs with one tap</li>
+        <li>Master checklist with 53 tasks across 7 sections</li>
+        <li>Record before &amp; after videos per room — protect yourself</li>
+        <li>Track inventory levels and flag low supplies</li>
+        <li>The Harvey System — 7-chapter pro cleaning guide built in</li>
+        <li>Stripe direct deposit when your job gets approved</li>
+        <li>Request job removal with documented reasons</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES GRID -->
+<section style="padding-top:0;">
+  <div class="section-eyebrow">Features</div>
+  <h2 class="section-title">Everything You Need.<br/>Nothing You Don't.</h2>
+  <div class="features-grid">
+    <div class="feat-card"><div class="feat-icon">📋</div><div class="feat-title">Smart Job Assignment</div><div class="feat-desc">Assign jobs instantly. Auto-reassigns to backup if primary doesn't respond in 8 hours.</div></div>
+    <div class="feat-card"><div class="feat-icon">✅</div><div class="feat-title">Review &amp; Approve</div><div class="feat-desc">See task completions, room videos, and inventory before approving payment.</div></div>
+    <div class="feat-card"><div class="feat-icon">📹</div><div class="feat-title">Video Documentation</div><div class="feat-desc">Before and after videos per room. Downloadable. Timestamped proof for every clean.</div></div>
+    <div class="feat-card"><div class="feat-icon">💰</div><div class="feat-title">Built-In Payments</div><div class="feat-desc">Stripe-powered payouts. Approve a job and your cleaner gets paid automatically.</div></div>
+    <div class="feat-card"><div class="feat-icon">🔔</div><div class="feat-title">Real-Time Alerts</div><div class="feat-desc">Notifications at every step — assigned, accepted, started, submitted, approved.</div></div>
+    <div class="feat-card"><div class="feat-icon">📊</div><div class="feat-title">Reports &amp; Analytics</div><div class="feat-desc">Monthly earnings, per-cleaner breakdowns, property performance, and trends.</div></div>
+    <div class="feat-card"><div class="feat-icon">🤖</div><div class="feat-title">AI Assistant</div><div class="feat-desc">Ask the TurnReady AI anything — cleaning protocols, staging tips, photo analysis.</div></div>
+    <div class="feat-card"><div class="feat-icon">🏆</div><div class="feat-title">Leaderboard</div><div class="feat-desc">Rank your team by jobs, earnings, and ratings. Top performers earn more opportunity.</div></div>
+    <div class="feat-card"><div class="feat-icon">🔒</div><div class="feat-title">Secure Property Info</div><div class="feat-desc">Access codes, alarm codes, and supply locations stored securely — visible only to assigned cleaners.</div></div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+  <div class="section-eyebrow">How It Works</div>
+  <h2 class="section-title">From Checkout to 5 Stars<br/>in One Flow.</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Guest checks out</div>
+        <div class="step-desc">A turnover is created for your property. You assign a cleaner with one tap — they're notified instantly.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Cleaner accepts &amp; gets to work</div>
+        <div class="step-desc">They follow the master checklist, document each room with video, and mark inventory levels as they go.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">You review &amp; approve</div>
+        <div class="step-desc">See every task, every video, every supply level before you approve. Reject with a reason if anything needs fixing.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Payment releases automatically</div>
+        <div class="step-desc">Approve and Stripe handles the rest. Your cleaner gets paid directly. No manual transfers needed.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Guest arrives to a 5-star property</div>
+        <div class="step-desc">Every turnover documented, every standard met. That's how 5-star reviews happen consistently.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="section-eyebrow">Pricing</div>
+  <h2 class="section-title">Simple, Transparent Pricing.</h2>
+  <p class="section-sub">Start free for 7 days. No setup fees. Cancel anytime.</p>
+
+  <div class="pricing-grid">
+    <div class="price-card">
+      <div class="price-plan">Solo</div>
+      <div class="price-amount"><span>$</span>29</div>
+      <div class="price-per">per month</div>
+      <ul class="price-features">
+        <li>1 manager account</li>
+        <li>Up to 3 properties</li>
+        <li>Up to 5 cleaners</li>
+        <li>Job assignment &amp; tracking</li>
+        <li>Stripe payments</li>
+        <li>Basic reporting</li>
+      </ul>
+      <a href="mailto:hello@turnready.app?subject=Solo Plan Interest" class="btn-plan outline">Get Early Access</a>
+    </div>
+
+    <div class="price-card featured">
+      <div class="price-badge">Most Popular</div>
+      <div class="price-plan">Pro</div>
+      <div class="price-amount"><span>$</span>49</div>
+      <div class="price-per">per month</div>
+      <ul class="price-features">
+        <li>1 manager account</li>
+        <li>Up to 10 properties</li>
+        <li>Unlimited cleaners</li>
+        <li>iCal sync (Airbnb &amp; VRBO)</li>
+        <li>Auto-assign to backup</li>
+        <li>Full reporting &amp; analytics</li>
+        <li>AI assistant</li>
+      </ul>
+      <a href="mailto:hello@turnready.app?subject=Pro Plan Interest" class="btn-plan solid">Get Early Access</a>
+    </div>
+
+    <div class="price-card">
+      <div class="price-plan">Agency</div>
+      <div class="price-amount"><span>$</span>99</div>
+      <div class="price-per">per month</div>
+      <ul class="price-features">
+        <li>Multiple manager accounts</li>
+        <li>Unlimited properties</li>
+        <li>Unlimited cleaners</li>
+        <li>Everything in Pro</li>
+        <li>White label option</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="mailto:hello@turnready.app?subject=Agency Plan Interest" class="btn-plan outline">Get Early Access</a>
+    </div>
+  </div>
+
+  <p class="price-trial">7-day free trial · No credit card required to start · Cancel anytime</p>
+</section>
+
+<!-- CTA -->
+<div class="cta-section">
+  <span class="stars">★ ★ ★ ★ ★</span>
+  <h2>Ready to Run a Tighter Operation?</h2>
+  <p>Join cleaning teams and Airbnb hosts getting early access to TurnReady.</p>
+  <a href="mailto:hello@turnready.app?subject=Early Access Request" class="btn-primary" style="font-size:16px;padding:16px 40px;">Get Early Access — It's Free</a>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Turn<span>Ready</span></div>
+  <div class="footer-links">
+    <a href="mailto:support@turnready.app">Support</a>
+    <a href="mailto:hello@turnready.app">Contact</a>
+    <a href="https://instagram.com/turnreadyapp">Instagram</a>
+  </div>
+  <div class="footer-copy">© 2026 TurnReady · turnready.app</div>
+</footer>
+
+</body>
 </html>
