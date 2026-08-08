@@ -813,10 +813,15 @@ function AIChat({onClose,user}){
             📎
             <input type="file" accept="image/*,video/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}} onChange={function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setMediaPreview({url:ev.target.result,type:file.type.startsWith("video")?"video":"image",name:file.name});};reader.readAsDataURL(file);e.target.value="";}}/>
           </label>
-          <input value={input} onChange={function(e){setInput(e.target.value);}}
+          <textarea value={input} onChange={function(e){
+              setInput(e.target.value);
+              e.target.style.height="auto";
+              e.target.style.height=Math.min(e.target.scrollHeight,120)+"px";
+            }}
             onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
             placeholder="Ask me anything... or attach a photo"
-            style={{flex:1,background:"#1A1A1A",border:"1px solid #2A2A2A",borderRadius:22,padding:"11px 16px",color:"#FFF",fontSize:14,outline:"none",fontFamily:"Inter,sans-serif"}}/>
+            rows={1}
+            style={{flex:1,background:"#1A1A1A",border:"1px solid #2A2A2A",borderRadius:22,padding:"11px 16px",color:"#FFF",fontSize:14,outline:"none",fontFamily:"Inter,sans-serif",resize:"none",overflow:"hidden",lineHeight:"1.4",wordBreak:"break-word",overflowWrap:"anywhere",minHeight:44,maxHeight:120,boxSizing:"border-box"}}/>
           <button onClick={send} disabled={loading||(!input.trim()&&!mediaPreview)} style={{width:44,height:44,borderRadius:"50%",border:"none",color:"#FFF",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,background:(!loading&&(input.trim()||mediaPreview))?"#CC0000":"#2A2A2A"}}>{loading?"...":"→"}</button>
         </div>
       </div>
@@ -7838,10 +7843,15 @@ function Messages({user,cleaners,addNotification}){
                   e.target.value="";
                 }}/>
             </label>
-            <input value={input} onChange={function(e){setInput(e.target.value);}}
-              onKeyDown={function(e){if(e.key==="Enter")send();}}
+            <textarea value={input} onChange={function(e){
+                setInput(e.target.value);
+                e.target.style.height="auto";
+                e.target.style.height=Math.min(e.target.scrollHeight,120)+"px";
+              }}
+              onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
               placeholder={"Message "+selCleaner.name+"..."}
-              style={{flex:1,background:"#1A1A1A",border:"1px solid #2A2A2A",borderRadius:22,padding:"11px 16px",color:"#FFF",fontSize:14,outline:"none",fontFamily:"Inter,sans-serif"}}/>
+              rows={1}
+              style={{flex:1,background:"#1A1A1A",border:"1px solid #2A2A2A",borderRadius:22,padding:"11px 16px",color:"#FFF",fontSize:14,outline:"none",fontFamily:"Inter,sans-serif",resize:"none",overflow:"hidden",lineHeight:"1.4",wordBreak:"break-word",overflowWrap:"anywhere",minHeight:44,maxHeight:120,boxSizing:"border-box"}}/>
             {(function(){
               var canSend=input.trim()||mediaPreview;
               return(
