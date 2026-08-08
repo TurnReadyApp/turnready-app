@@ -4887,11 +4887,26 @@ function Approvals({jobs,setJobs,props,setProps,cleaners,setCleaners,setView,set
               <div style={{display:"flex",gap:5,marginBottom:5}}>
                 <button onClick={function(){setRejectJob(job);setRejectReason("");setRejectCustom("");}} style={{flex:1,background:"transparent",border:"1px solid #EF4444",borderRadius:6,padding:"7px 6px",color:"#EF4444",fontSize:10,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif"}}>REJECT</button>
                 <button onClick={function(){
-                  // Build slot-like object for reassign modal
-                  var slotObj={id:job.id,date:job.scheduledDate||job.date,time:job.scheduledTime||job.time,cleanerId:job.cleanerId,status:"accepted"};
-                  setReassignSlot({prop:{id:job.propertyId,name:job.propertyName,schedule:[]},slot:slotObj});
-                }} style={{flex:1,background:"transparent",border:"1px solid #CC0000",borderRadius:6,padding:"7px 6px",color:"#CC0000",fontSize:10,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif"}}>👤 REASSIGN</button>
-                <button onClick={function(){setRemoveJobConfirm(job);}} style={{flex:1,background:"transparent",border:"1px solid #888",borderRadius:6,padding:"7px 6px",color:"#888",fontSize:10,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif"}}>✕ REMOVE</button>
+                  setRemoveJobConfirm(job); return;
+                // Remove cleaner from the slot on the property schedule
+                setProps(function(ps){return ps.map(function(pp){
+                  if(pp.id!==job.propertyId&&pp.name!==job.propertyName)return pp;
+                  return Object.assign({},pp,{schedule:(pp.schedule||[]).map(function(s){
+                    if(s.cleanerId!==job.cleanerId||s.date!==job.date)return s;
+                    return Object.assign({},s,{cleanerId:null,status:"open",assignedAt:null});
+                  })});
+                });});
+                // Mark job as cancelled
+                setJobs(function(js){return js.filter(function(j){return j.id!==job.id;});});
+                // Notify cleaner
+                setNotifications(function(prev){return [{
+                  id:"notif"+Date.now(),type:"info",icon:"ℹ️",
+                  title:"Job Assignment Removed",
+                  body:"Harvey has removed you from the job at "+job.propertyName+(job.date?" on "+job.date:"")+". Please contact Harvey if you have questions.",
+                  forRole:"cleaner",forCleaner:job.cleanerId,
+                  navTo:"My Jobs",time:new Date().toISOString(),read:false
+                }].concat(prev).slice(0,50);});
+              }} style={{flex:1,background:"transparent",border:"1px solid #888",borderRadius:6,padding:"7px 6px",color:"#888",fontSize:10,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif"}}>✕ REMOVE</button>
                 <button onClick={function(){setReviewJob(job);}} style={{flex:1,background:"transparent",border:"1px solid #555",borderRadius:6,padding:"7px 6px",color:"#AAA",fontSize:10,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif"}}>REVIEW</button>
               </div>
               <button onClick={function(){approve(job.id);}} style={{width:"100%",background:"#CC0000",border:"none",borderRadius:6,padding:"10px",color:"#FFF",fontSize:12,fontWeight:900,cursor:"pointer",fontFamily:"Arial Black,sans-serif",letterSpacing:.3}}>✓ APPROVE &amp; PAY {fmt(job.pay)}</button>
@@ -7550,9 +7565,10 @@ function Messages({user,cleaners,addNotification}){
       return s?JSON.parse(s):{};
     }catch(e){return {};}
   });
+  // Load messages from Supabase when a real user selects a contact
   const [msgsLoaded,setMsgsLoaded]=useState({});
   const [input,setInput]=useState("");
-  const [mediaPreview,setMediaPreview]=useState(null);
+  const [mediaPreview,setMediaPreview]=useState(null); // {url, type:'image'|'video', name}
 
   // Real managers: show only real cleaners (UUID ids) — filter out demo Maria/James/Priya
   var _rmgr=user&&user.id&&user.id.includes("-");
@@ -7565,23 +7581,6 @@ function Messages({user,cleaners,addNotification}){
         role:"manager",
         email:user.managerEmail||user.manager_email||""
       }];
-
-  // Auto-open thread if notification tap stored a contact ID
-  useEffect(function(){
-    try{
-      var openId=localStorage.getItem("turnready_open_msg");
-      if(!openId)return;
-      localStorage.removeItem("turnready_open_msg");
-      // Cleaner side — "manager" flag means open the manager contact
-      if(openId==="manager"&&!isManager&&contactList.length>0){
-        setSelCleaner(contactList[0]);
-        return;
-      }
-      // Manager side — find the cleaner by ID
-      var found=contactList.find(function(c){return c.id===openId;});
-      if(found){setSelCleaner(found);}
-    }catch(e){}
-  },[]);
 
   // Load messages from Supabase when contact is selected + subscribe real-time
   useEffect(function(){
@@ -7668,12 +7667,14 @@ function Messages({user,cleaners,addNotification}){
           read:false,
         }).catch(function(){});
       } else if(!isManager&&user.manager_id&&user.manager_id.includes("-")){
-        // Cleaner → manager: save notification for manager
+        // Cleaner → manager: save notification for manager, include sender ID
         createNotification({
           user_id:user.manager_id,
           type:"message",icon:"💬",
           title:"New Message from "+user.name,
           body:(newMsg.text||"").slice(0,80),
+          for_cleaner:user.id,
+          nav_to:"Messages",
           read:false,
         }).catch(function(){});
       }
@@ -9935,23 +9936,23 @@ function NotificationsPanel({notifications,setNotifications,onClose,user,setView
               <div key={n.id} onClick={function(){
                   setNotifications(function(ns){return ns.map(function(x){return x.id===n.id?Object.assign({},x,{read:true}):x;});});
                   if(n.navTo&&setView){
-                    setView(n.navTo);
-                    setShowNotifs(false);
-                    // For message notifications — store who to open chat with
-                    if(n.type==="message"||n.navTo==="Messages"){
-                      // Manager side: open chat with the cleaner who sent it
+                    // Store message thread target BEFORE changing view
+                    if(n.type==="message"||(n.navTo==="Messages")){
                       if(n.forCleaner){
+                        // Manager: open specific cleaner thread
                         try{localStorage.setItem("turnready_open_msg",n.forCleaner);}catch(e){}
-                      }
-                      // Cleaner side: open chat with manager (just flag it)
-                      if(!n.forCleaner){
+                      } else if(n.for_cleaner){
+                        try{localStorage.setItem("turnready_open_msg",n.for_cleaner);}catch(e){}
+                      } else {
+                        // Cleaner: open manager thread
                         try{localStorage.setItem("turnready_open_msg","manager");}catch(e){}
                       }
                     }
-                    // For emergency/problem reports, navigate to properties
                     if(n.type==="emergency"&&n.propId){
                       try{localStorage.setItem("turnready_open_prop",n.propId);}catch(e){}
                     }
+                    setView(n.navTo);
+                    setShowNotifs(false);
                   }
                 }}
                 style={{padding:"14px 16px",borderBottom:"1px solid #1A1A1A",background:n.read?"transparent":"rgba(204,0,0,.04)",cursor:"pointer"}}>
@@ -10079,7 +10080,7 @@ export default function App() {
           getNotifications(profile.id).then(function(dbNotifs){
             if(dbNotifs&&dbNotifs.length>0){
               var mapped=dbNotifs.map(function(n){return Object.assign({},n,{
-                forRole:n.for_role,navTo:n.nav_to,
+                forRole:n.for_role,navTo:n.nav_to,forCleaner:n.for_cleaner,
               });});
               setNotifications(mapped);
             }
@@ -10087,7 +10088,7 @@ export default function App() {
           // Subscribe to real-time notifications so bell updates without refreshing
           subscribeToNotifications(profile.id,function(newNotif){
             setNotifications(function(prev){
-              var mapped=Object.assign({},newNotif,{forRole:newNotif.for_role,navTo:newNotif.nav_to});
+              var mapped=Object.assign({},newNotif,{forRole:newNotif.for_role,navTo:newNotif.nav_to,forCleaner:newNotif.for_cleaner});
               return [mapped].concat(prev).slice(0,50);
             });
           });
@@ -10734,12 +10735,12 @@ export default function App() {
               if(u.id&&u.id.includes("-")){
                 getNotifications(u.id).then(function(dbNotifs){
                   if(dbNotifs&&dbNotifs.length>0){
-                    setNotifications(dbNotifs.map(function(n){return Object.assign({},n,{forRole:n.for_role,navTo:n.nav_to});}));
+                    setNotifications(dbNotifs.map(function(n){return Object.assign({},n,{forRole:n.for_role,navTo:n.nav_to,forCleaner:n.for_cleaner});}));
                   }
                 }).catch(function(e){console.error("Login notifications load:",e.message);});
                 subscribeToNotifications(u.id,function(newNotif){
                   setNotifications(function(prev){
-                    var mapped=Object.assign({},newNotif,{forRole:newNotif.for_role,navTo:newNotif.nav_to});
+                    var mapped=Object.assign({},newNotif,{forRole:newNotif.for_role,navTo:newNotif.nav_to,forCleaner:newNotif.for_cleaner});
                     return [mapped].concat(prev).slice(0,50);
                   });
                 });
