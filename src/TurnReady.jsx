@@ -7700,14 +7700,8 @@ function Messages({user,cleaners,addNotification}){
         }).catch(function(){});
       }
     }
-    // Local notification for sender's own device feedback
-    if(addNotification){
-      if(isManager){
-        addNotification({type:"message",icon:"💬",title:"Message from "+user.name,body:(newMsg.text||"").slice(0,60),forRole:"cleaner",forCleaner:selCleaner.id,navTo:"Messages",time:new Date().toISOString(),read:false});
-      } else {
-        addNotification({type:"message",icon:"💬",title:"New Message from "+user.name,body:(newMsg.text||"").slice(0,60),forRole:"manager",navTo:"Messages",time:new Date().toISOString(),read:false});
-      }
-    }
+    // NOTE: No local addNotification here — recipient gets notified via
+    // Supabase real-time subscription. Sender should NOT see their own message notification.
   }
 
   function broadcast(){
