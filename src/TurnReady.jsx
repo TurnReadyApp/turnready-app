@@ -9935,23 +9935,25 @@ function NotificationsPanel({notifications,setNotifications,onClose,user,setView
             return(
               <div key={n.id} onClick={function(){
                   setNotifications(function(ns){return ns.map(function(x){return x.id===n.id?Object.assign({},x,{read:true}):x;});});
-                  if(n.navTo&&setView){
+                  // Determine where to navigate — use navTo if set, fall back to type
+                  var dest=n.navTo||n.nav_to||null;
+                  if(!dest){
+                    if(n.type==="message")dest="Messages";
+                    else if(n.type==="assigned"||n.type==="job_started"||n.type==="paid"||n.type==="rejected"||n.type==="needs_resubmit")dest="My Jobs";
+                    else if(n.type==="emergency"||n.type==="removal_request"||n.type==="ical_suggest")dest="Properties";
+                    else if(n.type==="pending_approval")dest="Approvals";
+                  }
+                  if(dest&&setView){
                     // Store message thread target BEFORE changing view
-                    if(n.type==="message"||(n.navTo==="Messages")){
-                      if(n.forCleaner){
-                        // Manager: open specific cleaner thread
-                        try{localStorage.setItem("turnready_open_msg",n.forCleaner);}catch(e){}
-                      } else if(n.for_cleaner){
-                        try{localStorage.setItem("turnready_open_msg",n.for_cleaner);}catch(e){}
+                    if(n.type==="message"||dest==="Messages"){
+                      var threadId=n.forCleaner||n.for_cleaner||null;
+                      if(threadId){
+                        try{localStorage.setItem("turnready_open_msg",threadId);}catch(e){}
                       } else {
-                        // Cleaner: open manager thread
                         try{localStorage.setItem("turnready_open_msg","manager");}catch(e){}
                       }
                     }
-                    if(n.type==="emergency"&&n.propId){
-                      try{localStorage.setItem("turnready_open_prop",n.propId);}catch(e){}
-                    }
-                    setView(n.navTo);
+                    setView(dest);
                     setShowNotifs(false);
                   }
                 }}
@@ -9966,7 +9968,7 @@ function NotificationsPanel({notifications,setNotifications,onClose,user,setView
                     <div style={{fontSize:12,color:"#888",lineHeight:1.5,marginBottom:4}}>{n.body}</div>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <div style={{fontSize:10,color:"#555"}}>{n.time?timeAgo(n.time):""}</div>
-                      {n.navTo&&<div style={{fontSize:10,color:"#CC0000",fontWeight:700}}>Tap to view →</div>}
+                      {(n.navTo||n.nav_to||n.type==="message"||n.type==="assigned"||n.type==="emergency"||n.type==="pending_approval")&&<div style={{fontSize:10,color:"#CC0000",fontWeight:700}}>Tap to view →</div>}
                     </div>
                   </div>
                 </div>
