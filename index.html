@@ -6,6 +6,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0D0D0D" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="TurnReady" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>TurnReady</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,6 +18,15 @@
       html, body, #root { height: 100%; }
       body { margin: 0; background: #0D0D0D; }
     </style>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(function (reg) { console.log('[SW] Registered:', reg.scope); })
+            .catch(function (err) { console.log('[SW] Failed:', err); });
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
