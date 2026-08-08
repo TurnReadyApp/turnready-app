@@ -7617,13 +7617,16 @@ function Messages({user,cleaners,addNotification}){
       setMsgs(function(prev){
         var updated=Object.assign({},prev);
         var existing=updated[incomingKey]||[];
-        // Avoid duplicates
         if(existing.find(function(m){return m.id===mapped.id;}))return prev;
         updated[incomingKey]=existing.concat([mapped]);
         return updated;
       });
     });
-    return function(){if(channel&&channel.unsubscribe)channel.unsubscribe();};
+    return function(){
+      if(channel){
+        try{supabase.removeChannel(channel);}catch(e){}
+      }
+    };
   },[selCleaner]);
 
   function send(){
