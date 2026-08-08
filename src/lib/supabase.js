@@ -412,8 +412,10 @@ export async function sendMessage(message) {
 }
 
 export function subscribeToMessages(userId, callback) {
+  // Use unique channel name to avoid conflicts on re-subscription
+  const channelName = `messages:${userId}:${Date.now()}`
   return supabase
-    .channel(`messages:${userId}`)
+    .channel(channelName)
     .on('postgres_changes', {
       event: 'INSERT',
       schema: 'public',
@@ -423,9 +425,18 @@ export function subscribeToMessages(userId, callback) {
     .subscribe()
 }
 
-// ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
-
-export async function getNotifications(userId) {
+export function subscribeToNotifications(userId, callback) {
+  const channelName = `notifications:${userId}:${Date.now()}`
+  return supabase
+    .channel(channelName)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'notifications',
+      filter: `user_id=eq.${userId}`
+    }, payload => callback(payload.new))
+    .subscribe()
+}
   const { data, error } = await supabase
     .from('notifications')
     .select('*')
