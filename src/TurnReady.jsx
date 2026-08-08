@@ -685,7 +685,8 @@ const FAQS = [
 ];
 
 // ─── STYLES ──────────────────────────────────────────────────────────────────
-var css = "\n  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap');\n  *{box-sizing:border-box;margin:0;padding:0;}\n  body{background:#0D0D0D;color:#FFFFFF;font-family:'Inter', sans-serif;-webkit-font-smoothing:antialiased;}\n  ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:#141414;}\n  ::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:2px;}\n\n  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:#CC0000;color:#FFFFFF;border:none;border-radius:8px;padding:11px 22px;font-family:'Inter', sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s;letter-spacing:.2px;}\n  .btn:hover{background:#FF1111;transform:translateY(-1px);box-shadow:0 4px 20px rgba(204,0,0,.4);}\n  .btn.ghost{background:transparent;border:1.5px solid #2A2A2A;color:#E8E8E8;}\n  .btn.ghost:hover{border-color:#CC0000;color:#FFFFFF;background:rgba(204,0,0,0.08);box-shadow:none;}\n  .btn.sm{padding:7px 14px;font-size:12px;border-radius:6px;}\n  .btn.danger{background:#EF4444;}\n  .btn.success{background:#22C55E;color:#000;}\n\n  .card{background:var(--card-bg,#1A1A1A);border:1px solid var(--card-border,#2A2A2A);border-radius:14px;padding:20px;transition:background .2s,border-color .2s;}\n  .card.hover:hover{border-color:#CC000044;cursor:pointer;}\n\n  input,select,textarea{background:var(--input-bg,#141414);border:1px solid var(--input-border,#2A2A2A);color:var(--input-color,#FFFFFF);border-radius:8px;padding:10px 13px;font-family:'Inter', sans-serif;font-size:13px;outline:none;width:100%;transition:border-color .2s;}\n  input:focus,select:focus,textarea:focus{border-color:#CC0000;}\n  select option{background:#1A1A1A;}\n  label{font-size:11px;color:var(--label-color,#888888);font-weight:500;letter-spacing:.5px;margin-bottom:5px;display:block;text-transform:uppercase;}\n  textarea{resize:vertical;min-height:80px;}\n\n  .tab{padding:8px 16px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:500;transition:all .2s;color:#888888;border:none;background:none;font-family:'Inter', sans-serif;}\n  .tab.on{background:rgba(204,0,0,0.15);color:#CC0000;}\n  .tab:hover:not(.on){color:#FFFFFF;}\n\n  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}\n  .green{background:rgba(34,197,94,.15);color:#22C55E;}\n  .amber{background:rgba(245,158,11,.15);color:#F59E0B;}\n  .red-b{background:rgba(204,0,0,.2);color:#FF6666;}\n  .gray{background:rgba(136,136,136,.15);color:#888888;}\n\n  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;}\n  .modal{background:#1A1A1A;border:1px solid #2A2A2A;border-radius:18px;padding:28px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;}\n\n  .cb-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background .15s;}\n  .cb-row:hover{background:#141414;}\n  .cb{width:20px;height:20px;border-radius:5px;border:2px solid #2A2A2A;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;}\n  .cb.on{background:#CC0000;border-color:#CC0000;}\n\n  .avatar{width:36px;height:36px;border-radius:50%;background:rgba(204,0,0,0.15);border:1.5px solid #CC0000;color:#CC0000;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}\n\n  .prog-bar{height:4px;background:#2A2A2A;border-radius:2px;overflow:hidden;}\n  .prog-fill{height:100%;background:#CC0000;border-radius:2px;transition:width .4s;}\n\n  .stat-card{background:#1A1A1A;border:1px solid #2A2A2A;border-radius:12px;padding:16px;flex:1;min-width:120px;}\n\n  .notif-dot{width:8px;height:8px;background:#CC0000;border-radius:50%;display:inline-block;margin-left:5px;animation:pulse 1.5s infinite;}\n  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}\n\n  .section-header{font-size:13px;color:#CC0000;text-transform:uppercase;letter-spacing:1.5px;font-weight:900;padding:16px 12px 8px;margin-top:6px;}\n\n  .inv-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #2A2A2A;}\n  .inv-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}\n\n  .faq-item{border-bottom:1px solid #2A2A2A;overflow:hidden;}\n  .faq-q{display:flex;justify-content:space-between;align-items:center;padding:16px;cursor:pointer;font-weight:500;font-size:14px;transition:color .2s;}\n  .faq-q:hover{color:#CC0000;}\n  .faq-a{padding:0 16px 16px;color:#888888;font-size:13px;line-height:1.7;}\n\n  .chat-bubble{max-width:80%;padding:11px 15px;border-radius:12px;font-size:13px;line-height:1.6;margin:4px 0;}\n  .chat-bubble.user{background:#CC0000;color:#FFFFFF;border-radius:12px 12px 3px 12px;margin-left:auto;}\n  .chat-bubble.ai{background:#141414;color:#E8E8E8;border-radius:12px 12px 12px 3px;border:1px solid #2A2A2A;}\n\n  .cal-day{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:all .15s;}\n  .cal-day:hover{background:#2A2A2A;}\n  .cal-day.has-job{background:rgba(204,0,0,0.15);color:#CC0000;font-weight:700;}\n  .cal-day.today{border:1.5px solid #CC0000;}\n\n  .room-card{background:#141414;border:1px solid #2A2A2A;border-radius:11px;padding:14px;cursor:pointer;transition:all .2s;}\n  .room-card:hover{border-color:#CC0000;background:#1A1A1A;}\n\n  .glow-line{height:1px;background:linear-gradient(90deg,transparent,#CC0000,transparent);margin:24px 0;}\n";
+var css = "\n  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap');\n  *{box-sizing:border-box;margin:0;padding:0;}\n  body{background:#0D0D0D;color:#FFFFFF;font-family:'Inter', sans-serif;-webkit-font-smoothing:antialiased;}\n  ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:#141414;}\n  ::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:2px;}\n\n  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:#CC0000;color:#FFFFFF;border:none;border-radius:8px;padding:11px 22px;font-family:'Inter', sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s;letter-spacing:.2px;}\n  .btn:hover{background:#FF1111;transform:translateY(-1px);box-shadow:0 4px 20px rgba(204,0,0,.4);}\n  .btn.ghost{background:transparent;border:1.5px solid #2A2A2A;color:#E8E8E8;}\n  .btn.ghost:hover{border-color:#CC0000;color:#FFFFFF;background:rgba(204,0,0,0.08);box-shadow:none;}\n  .btn.sm{padding:7px 14px;font-size:12px;border-radius:6px;}\n  .btn.danger{background:#EF4444;}\n  .btn.success{background:#22C55E;color:#000;}\n\n  .card{background:var(--card-bg,#1A1A1A);border:1px solid var(--card-border,#2A2A2A);border-radius:14px;padding:20px;transition:background .2s,border-color .2s;}\n  .card.hover:hover{border-color:#CC000044;cursor:pointer;}\n\n  input,select,textarea{background:var(--input-bg,#141414);border:1px solid var(--input-border,#2A2A2A);color:var(--input-color,#FFFFFF);border-radius:8px;padding:10px 13px;font-family:'Inter', sans-serif;font-size:13px;outline:none;width:100%;transition:border-color .2s;}\n  input:focus,select:focus,textarea:focus{border-color:#CC0000;}\n  select option{background:#1A1A1A;}\n  label{font-size:11px;color:var(--label-color,#888888);font-weight:500;letter-spacing:.5px;margin-bottom:5px;display:block;text-transform:uppercase;}\n  textarea{resize:vertical;min-height:80px;}\n\n  .tab{padding:8px 16px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:500;transition:all .2s;color:#888888;border:none;background:none;font-family:'Inter', sans-serif;}\n  .tab.on{background:rgba(204,0,0,0.15);color:#CC0000;}\n  .tab:hover:not(.on){color:#FFFFFF;}\n\n  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}\n  .green{background:rgba(34,197,94,.15);color:#22C55E;}\n  .amber{background:rgba(245,158,11,.15);color:#F59E0B;}\n  .red-b{background:rgba(204,0,0,.2);color:#FF6666;}\n  .gray{background:rgba(136,136,136,.15);color:#888888;}\n\n  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;}\n  .modal{background:#1A1A1A;border:1px solid #2A2A2A;border-radius:18px;padding:28px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;}\n\n  .cb-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background .15s;}\n  .cb-row:hover{background:#141414;}\n  .cb{width:20px;height:20px;border-radius:5px;border:2px solid #2A2A2A;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;}\n  .cb.on{background:#CC0000;border-color:#CC0000;}\n\n  .avatar{width:36px;height:36px;border-radius:50%;background:rgba(204,0,0,0.15);border:1.5px solid #CC0000;color:#CC0000;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}\n\n  .prog-bar{height:4px;background:#2A2A2A;border-radius:2px;overflow:hidden;}\n  .prog-fill{height:100%;background:#CC0000;border-radius:2px;transition:width .4s;}\n\n  .stat-card{background:#1A1A1A;border:1px solid #2A2A2A;border-radius:12px;padding:16px;flex:1;min-width:120px;}\n\n  .notif-dot{width:8px;height:8px;background:#CC0000;border-radius:50%;display:inline-block;margin-left:5px;animation:pulse 1.5s infinite;}\n  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  @keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-16px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}\n\n  .section-header{font-size:13px;color:#CC0000;text-transform:uppercase;letter-spacing:1.5px;font-weight:900;padding:16px 12px 8px;margin-top:6px;}\n\n  .inv-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #2A2A2A;}\n  .inv-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}\n\n  .faq-item{border-bottom:1px solid #2A2A2A;overflow:hidden;}\n  .faq-q{display:flex;justify-content:space-between;align-items:center;padding:16px;cursor:pointer;font-weight:500;font-size:14px;transition:color .2s;}\n  .faq-q:hover{color:#CC0000;}\n  .faq-a{padding:0 16px 16px;color:#888888;font-size:13px;line-height:1.7;}\n\n  .chat-bubble{max-width:80%;padding:11px 15px;border-radius:12px;font-size:13px;line-height:1.6;margin:4px 0;}\n  .chat-bubble.user{background:#CC0000;color:#FFFFFF;border-radius:12px 12px 3px 12px;margin-left:auto;}\n  .chat-bubble.ai{background:#141414;color:#E8E8E8;border-radius:12px 12px 12px 3px;border:1px solid #2A2A2A;}\n\n  .cal-day{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:all .15s;}\n  .cal-day:hover{background:#2A2A2A;}\n  .cal-day.has-job{background:rgba(204,0,0,0.15);color:#CC0000;font-weight:700;}\n  .cal-day.today{border:1.5px solid #CC0000;}\n\n  .room-card{background:#141414;border:1px solid #2A2A2A;border-radius:11px;padding:14px;cursor:pointer;transition:all .2s;}\n  .room-card:hover{border-color:#CC0000;background:#1A1A1A;}\n\n  .glow-line{height:1px;background:linear-gradient(90deg,transparent,#CC0000,transparent);margin:24px 0;}\n";
 
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -813,15 +814,10 @@ function AIChat({onClose,user}){
             📎
             <input type="file" accept="image/*,video/*" capture="environment" style={{position:"fixed",top:-9999,left:-9999,opacity:0,width:1,height:1}} onChange={function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setMediaPreview({url:ev.target.result,type:file.type.startsWith("video")?"video":"image",name:file.name});};reader.readAsDataURL(file);e.target.value="";}}/>
           </label>
-          <textarea value={input} onChange={function(e){
-              setInput(e.target.value);
-              e.target.style.height="auto";
-              e.target.style.height=Math.min(e.target.scrollHeight,120)+"px";
-            }}
+          <input value={input} onChange={function(e){setInput(e.target.value);}}
             onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
             placeholder="Ask me anything... or attach a photo"
-            rows={1}
-            style={{flex:1,background:"#1A1A1A",border:"1px solid #2A2A2A",borderRadius:22,padding:"11px 16px",color:"#FFF",fontSize:14,outline:"none",fontFamily:"Inter,sans-serif",resize:"none",overflow:"hidden",lineHeight:"1.4",wordBreak:"break-word",overflowWrap:"anywhere",minHeight:44,maxHeight:120,boxSizing:"border-box"}}/>
+            style={{flex:1,background:"#1A1A1A",border:"1px solid #2A2A2A",borderRadius:22,padding:"11px 16px",color:"#FFF",fontSize:14,outline:"none",fontFamily:"Inter,sans-serif"}}/>
           <button onClick={send} disabled={loading||(!input.trim()&&!mediaPreview)} style={{width:44,height:44,borderRadius:"50%",border:"none",color:"#FFF",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,background:(!loading&&(input.trim()||mediaPreview))?"#CC0000":"#2A2A2A"}}>{loading?"...":"→"}</button>
         </div>
       </div>
@@ -7843,15 +7839,10 @@ function Messages({user,cleaners,addNotification}){
                   e.target.value="";
                 }}/>
             </label>
-            <textarea value={input} onChange={function(e){
-                setInput(e.target.value);
-                e.target.style.height="auto";
-                e.target.style.height=Math.min(e.target.scrollHeight,120)+"px";
-              }}
-              onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+            <input value={input} onChange={function(e){setInput(e.target.value);}}
+              onKeyDown={function(e){if(e.key==="Enter")send();}}
               placeholder={"Message "+selCleaner.name+"..."}
-              rows={1}
-              style={{flex:1,background:"#1A1A1A",border:"1px solid #2A2A2A",borderRadius:22,padding:"11px 16px",color:"#FFF",fontSize:14,outline:"none",fontFamily:"Inter,sans-serif",resize:"none",overflow:"hidden",lineHeight:"1.4",wordBreak:"break-word",overflowWrap:"anywhere",minHeight:44,maxHeight:120,boxSizing:"border-box"}}/>
+              style={{flex:1,background:"#1A1A1A",border:"1px solid #2A2A2A",borderRadius:22,padding:"11px 16px",color:"#FFF",fontSize:14,outline:"none",fontFamily:"Inter,sans-serif"}}/>
             {(function(){
               var canSend=input.trim()||mediaPreview;
               return(
@@ -9992,6 +9983,34 @@ function NotificationsPanel({notifications,setNotifications,onClose,user,setView
 }
 
 
+// ── TOAST NOTIFICATION ────────────────────────────────────────────────────────
+function ToastNotification({toast,onTap,onClose}){
+  if(!toast)return null;
+  return(
+    <div onClick={function(){onTap&&onTap(toast);onClose&&onClose();}}
+      style={{position:"fixed",top:70,left:"50%",transform:"translateX(-50%)",
+        zIndex:9999,width:"calc(100% - 32px)",maxWidth:420,
+        background:"#1A1A1A",border:"1px solid #2A2A2A",
+        borderRadius:14,padding:"12px 14px",
+        display:"flex",alignItems:"flex-start",gap:12,
+        boxShadow:"0 8px 32px rgba(0,0,0,.6)",cursor:"pointer",
+        animation:"slideDown .25s ease"}}>
+      <div style={{width:38,height:38,borderRadius:10,background:"#222",
+        display:"flex",alignItems:"center",justifyContent:"center",
+        fontSize:18,flexShrink:0}}>{toast.icon||"🔔"}</div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#FFF",marginBottom:2,
+          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{toast.title}</div>
+        {toast.body&&<div style={{fontSize:12,color:"#888",lineHeight:1.4,
+          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{toast.body}</div>}
+      </div>
+      <button onClick={function(e){e.stopPropagation();onClose&&onClose();}}
+        style={{background:"none",border:"none",color:"#555",fontSize:18,
+          cursor:"pointer",flexShrink:0,padding:"0 2px",lineHeight:1}}>×</button>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("Dashboard");
@@ -10103,6 +10122,10 @@ export default function App() {
               var mapped=Object.assign({},newNotif,{forRole:newNotif.for_role,navTo:newNotif.nav_to,forCleaner:newNotif.for_cleaner});
               return [mapped].concat(prev).slice(0,50);
             });
+            // Show toast popup
+            if(toastTimer.current)clearTimeout(toastTimer.current);
+            setToast({icon:newNotif.icon||"🔔",title:newNotif.title||"New notification",body:newNotif.body||"",dest:newNotif.nav_to||null,forCleaner:newNotif.for_cleaner||null});
+            toastTimer.current=setTimeout(function(){setToast(null);},4000);
           });
         }
         // Map DB field names to app field names
@@ -10410,6 +10433,8 @@ export default function App() {
     }catch(e){return [];}
   });
   const [notifRead, setNotifRead] = useState({});
+  const [toast, setToast] = useState(null); // {icon, title, body, dest}
+  const toastTimer = useRef(null);
 
   // Persist notifications to localStorage
   useEffect(function(){
@@ -10755,6 +10780,10 @@ export default function App() {
                     var mapped=Object.assign({},newNotif,{forRole:newNotif.for_role,navTo:newNotif.nav_to,forCleaner:newNotif.for_cleaner});
                     return [mapped].concat(prev).slice(0,50);
                   });
+                  // Show toast popup
+                  if(toastTimer.current)clearTimeout(toastTimer.current);
+                  setToast({icon:newNotif.icon||"🔔",title:newNotif.title||"New notification",body:newNotif.body||"",dest:newNotif.nav_to||null,forCleaner:newNotif.for_cleaner||null});
+                  toastTimer.current=setTimeout(function(){setToast(null);},4000);
                 });
               }
               try{var _rem=localStorage.getItem("turnready_shared_removals");if(_rem){var _rp=JSON.parse(_rem);if(_rp&&_rp.length)setPendingRemovals(_rp);}}catch(e){}
@@ -11127,16 +11156,11 @@ export default function App() {
                   body:n.body||null,
                   for_role:n.forRole||null,
                   nav_to:n.navTo||null,
+                  for_cleaner:n.forCleaner||null,
                   read:false,
                 }).catch(function(e){console.error("Notif save:",e.message);});
-                // Fire push to cleaner for job assignment
                 if(n.type==="assigned"&&n.forCleaner&&n.forCleaner.includes("-")){
-                  sendPushNotification({
-                    userId:n.forCleaner,
-                    title:n.title||"New Job Assigned!",
-                    body:n.body||"You have a new cleaning job. Open TurnReady to accept.",
-                    url:"/",
-                  }).catch(function(){});
+                  sendPushNotification({userId:n.forCleaner,title:n.title||"New Job Assigned!",body:n.body||"You have a new cleaning job.",url:"/"}).catch(function(){});
                 }
               }
             }} initialSel={selectedProp} onClearSel={function(){setSelectedProp(null);}}/>;
@@ -11247,6 +11271,19 @@ export default function App() {
           setNotifications={setNotifications} onClose={()=>setShowNotifs(false)} user={user}
           setView={setView} setShowNotifs={setShowNotifs}/>}
         {showAI&&<AIChat onClose={()=>setShowAI(false)} user={user}/>}
+        <ToastNotification toast={toast} onClose={function(){setToast(null);}} onTap={function(t){
+          setToast(null);
+          var dest=t.dest||null;
+          if(!dest){
+            if(t.type==="message"||t.icon==="💬")dest="Messages";
+            else if(t.type==="assigned"||t.type==="job_started")dest=user&&user.role==="manager"?"Properties":"My Jobs";
+            else if(t.type==="emergency")dest="Properties";
+          }
+          if(dest)setView(dest);
+          if((t.dest==="Messages"||t.icon==="💬")&&t.forCleaner){
+            try{localStorage.setItem("turnready_open_msg",t.forCleaner);}catch(e){}
+          }
+        }}/>
       </div>
     </div>
   );
