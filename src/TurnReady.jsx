@@ -7668,18 +7668,36 @@ function Messages({user,cleaners,addNotification}){
           type:"message",icon:"💬",
           title:"New Message from "+user.name,
           body:(newMsg.text||"").slice(0,80),
+          for_role:"cleaner",
+          nav_to:"Messages",
+          for_cleaner:user.id,
           read:false,
         }).catch(function(){});
+        // Push notification to cleaner's phone
+        sendPushNotification({
+          userId:selCleaner.id,
+          title:"💬 "+user.name,
+          body:(newMsg.text||"New message"),
+          url:"/",
+        }).catch(function(){});
       } else if(!isManager&&user.manager_id&&user.manager_id.includes("-")){
-        // Cleaner → manager: save notification for manager, include sender ID
+        // Cleaner → manager: save notification for manager
         createNotification({
           user_id:user.manager_id,
           type:"message",icon:"💬",
           title:"New Message from "+user.name,
           body:(newMsg.text||"").slice(0,80),
-          for_cleaner:user.id,
+          for_role:"manager",
           nav_to:"Messages",
+          for_cleaner:user.id,
           read:false,
+        }).catch(function(){});
+        // Push notification to manager's phone
+        sendPushNotification({
+          userId:user.manager_id,
+          title:"💬 "+user.name,
+          body:(newMsg.text||"New message"),
+          url:"/",
         }).catch(function(){});
       }
     }
